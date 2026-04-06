@@ -1,7 +1,10 @@
+import type { TypeCheckDiagnostic } from './typecheck';
+
 export type CapabilityName =
   | 'lattice:transition:initiate'
   | 'lattice:transition:commit'
   | 'lattice:transition:rollback'
+  | 'lattice:typecheck:validate'
   | 'mesh:render:project'
   | 'mesh:render:update'
   | 'system:bootstrap'
@@ -36,7 +39,8 @@ export type LawResult<T> =
   | { readonly ok: false; readonly error: LawError };
 
 export interface LawError {
-  readonly code: 'TOKEN_MISSING' | 'TOKEN_EXPIRED' | 'TOKEN_INVALID' | 'CAPABILITY_DENIED' | 'LEDGER_CORRUPT' | 'CRYPTO_FAILURE';
+  readonly code: 'TOKEN_MISSING' | 'TOKEN_EXPIRED' | 'TOKEN_INVALID' | 'CAPABILITY_DENIED' | 'LEDGER_CORRUPT' | 'CRYPTO_FAILURE' | 'TYPE_MISMATCH';
   readonly message: string;
   readonly capability?: CapabilityName;
+  readonly diagnostics?: ReadonlyArray<TypeCheckDiagnostic>;
 }
