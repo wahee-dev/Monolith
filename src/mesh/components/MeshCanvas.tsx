@@ -86,7 +86,7 @@ export function MeshCanvas({
   containerWidth,
   containerHeight,
 }: MeshCanvasProps): React.ReactElement {
-  const { svgProps } = useInfiniteCanvas(containerWidth, containerHeight);
+  const { svgProps } = useInfiniteCanvas(canvasState, onCanvasStateChange, containerWidth, containerHeight);
 
   const handleCanvasClick = useCallback(
     (e: React.MouseEvent) => {

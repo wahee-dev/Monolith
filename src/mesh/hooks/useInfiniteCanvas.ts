@@ -1,24 +1,18 @@
 'use client';
 
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useRef } from 'react';
 import type { Point, CanvasState } from '../types';
 
 const MIN_ZOOM = 0.1;
 const MAX_ZOOM = 5.0;
 const ZOOM_FACTOR = 0.001;
-const INITIAL_STATE: CanvasState = {
-  offset: { x: 0, y: 0 },
-  zoom: 1,
-  selectedNodeId: null,
-  editingNodeId: null,
-};
 
 interface DragState {
-  readonly isDragging: boolean;
-  readonly startX: number;
-  readonly startY: number;
-  readonly startOffsetX: number;
-  readonly startOffsetY: number;
+  isDragging: boolean;
+  startX: number;
+  startY: number;
+  startOffsetX: number;
+  startOffsetY: number;
 }
 
 const INITIAL_DRAG: DragState = {
@@ -29,8 +23,12 @@ const INITIAL_DRAG: DragState = {
   startOffsetY: 0,
 };
 
-export function useInfiniteCanvas(containerWidth: number, containerHeight: number): {
-  readonly canvasState: CanvasState;
+export function useInfiniteCanvas(
+  canvasState: CanvasState,
+  setCanvasState: React.Dispatch<React.SetStateAction<CanvasState>>,
+  containerWidth: number,
+  containerHeight: number,
+): {
   readonly svgProps: {
     readonly viewBox: string;
     readonly onMouseDown: (e: React.MouseEvent) => void;
@@ -41,9 +39,7 @@ export function useInfiniteCanvas(containerWidth: number, containerHeight: numbe
   readonly screenToWorld: (screen: Point) => Point;
   readonly panTo: (point: Point) => void;
   readonly zoomTo: (level: number, center?: Point) => void;
-  readonly setCanvasState: React.Dispatch<React.SetStateAction<CanvasState>>;
 } {
-  const [canvasState, setCanvasState] = useState<CanvasState>(INITIAL_STATE);
   const dragRef = useRef<DragState>(INITIAL_DRAG);
 
   const viewBox = `${canvasState.offset.x} ${canvasState.offset.y} ${containerWidth / canvasState.zoom} ${containerHeight / canvasState.zoom}`;
@@ -58,7 +54,7 @@ export function useInfiniteCanvas(containerWidth: number, containerHeight: numbe
 
   const panTo = useCallback((point: Point): void => {
     setCanvasState((prev) => ({ ...prev, offset: point }));
-  }, []);
+  }, [setCanvasState]);
 
   const zoomTo = useCallback((level: number, center?: Point): void => {
     const clamped = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, level));
@@ -76,7 +72,7 @@ export function useInfiniteCanvas(containerWidth: number, containerHeight: numbe
       }
       return { ...prev, zoom: clamped };
     });
-  }, []);
+  }, [setCanvasState]);
 
   const onMouseDown = useCallback((e: React.MouseEvent): void => {
     const isMiddleButton = e.button === 1;
@@ -104,7 +100,7 @@ export function useInfiniteCanvas(containerWidth: number, containerHeight: numbe
         y: dragRef.current.startOffsetY - dy,
       },
     }));
-  }, [canvasState.zoom]);
+  }, [canvasState.zoom, setCanvasState]);
 
   const onMouseUp = useCallback((): void => {
     dragRef.current = INITIAL_DRAG;
@@ -114,7 +110,7 @@ export function useInfiniteCanvas(containerWidth: number, containerHeight: numbe
     e.preventDefault();
     const delta = -e.deltaY * ZOOM_FACTOR;
     const newZoom = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, canvasState.zoom * (1 + delta)));
-    const rect = (e.currentTarget as SVGSVGElement).getBoundingClientRect();
+    const rect = e.currentTarget.getBoundingClientRect();
     const mouseX = e.clientX - rect.left;
     const mouseY = e.clientY - rect.top;
 
@@ -132,10 +128,9 @@ export function useInfiniteCanvas(containerWidth: number, containerHeight: numbe
       zoom: newZoom,
       offset: newOffset,
     }));
-  }, [canvasState.zoom, canvasState.offset]);
+  }, [canvasState.zoom, canvasState.offset, setCanvasState]);
 
   return {
-    canvasState,
     svgProps: {
       viewBox,
       onMouseDown,
@@ -146,6 +141,5 @@ export function useInfiniteCanvas(containerWidth: number, containerHeight: numbe
     screenToWorld,
     panTo,
     zoomTo,
-    setCanvasState,
   };
 }

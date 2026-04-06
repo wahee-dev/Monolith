@@ -145,7 +145,7 @@ export default function MeshPage(): React.ReactElement {
 
   useEffect(() => {
     checkAll(expressions);
-  }, []);
+  }, [expressions, checkAll]);
 
   useEffect(() => {
     const el = containerRef.current;
@@ -229,7 +229,7 @@ export default function MeshPage(): React.ReactElement {
       const newNodes = new Map(prev.nodes);
       newNodes.delete(createLatticeNodeId(nodeId));
       const newConnections = prev.connections.filter(
-        (c) => (c.from as string) !== nodeId && (c.to as string) !== nodeId,
+        (c) => String(c.from) !== nodeId && String(c.to) !== nodeId,
       );
       return {
         ...prev,
@@ -319,8 +319,8 @@ export default function MeshPage(): React.ReactElement {
                     cursor: 'pointer',
                     textAlign: 'left',
                   }}
-                  onMouseEnter={(e) => { (e.target as HTMLElement).style.backgroundColor = '#1a1a2e'; }}
-                  onMouseLeave={(e) => { (e.target as HTMLElement).style.backgroundColor = 'transparent'; }}
+                  onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = '#1a1a2e'; }}
+                  onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'transparent'; }}
                 >
                   {kind}
                 </button>
