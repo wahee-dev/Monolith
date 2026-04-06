@@ -52,9 +52,15 @@ export type LawResult<T> =
   | { readonly ok: true; readonly value: T }
   | { readonly ok: false; readonly error: LawError };
 
-export interface LawError {
-  readonly code: 'TOKEN_MISSING' | 'TOKEN_EXPIRED' | 'TOKEN_INVALID' | 'CAPABILITY_DENIED' | 'LEDGER_CORRUPT' | 'CRYPTO_FAILURE' | 'TYPE_MISMATCH';
-  readonly message: string;
-  readonly capability?: CapabilityName;
-  readonly diagnostics?: ReadonlyArray<TypeCheckDiagnostic>;
-}
+export type LawError =
+  | {
+      readonly code: 'TOKEN_MISSING' | 'TOKEN_EXPIRED' | 'TOKEN_INVALID' | 'CAPABILITY_DENIED' | 'LEDGER_CORRUPT' | 'CRYPTO_FAILURE';
+      readonly message: string;
+      readonly capability?: CapabilityName;
+    }
+  | {
+      readonly code: 'TYPE_MISMATCH';
+      readonly message: string;
+      readonly capability?: CapabilityName;
+      readonly diagnostics: ReadonlyArray<TypeCheckDiagnostic>;
+    };

@@ -211,12 +211,8 @@ export function ShadowAppPanel({ latticeState, expressions }: ShadowAppPanelProp
   const incomingFlows = useMemo(() => {
     const map = new Map<string, string[]>();
     for (const flow of state.dataFlows) {
-      const existing = map.get(flow.to);
-      if (existing !== undefined) {
-        existing.push(flow.from.slice(0, 8));
-      } else {
-        map.set(flow.to, [flow.from.slice(0, 8)]);
-      }
+      const prev = map.get(flow.to) ?? [];
+      map.set(flow.to, [...prev, flow.from.slice(0, 8)]);
     }
     return map;
   }, [state.dataFlows]);
