@@ -1,6 +1,7 @@
 import type { LatticeNodeKind } from '@lattice/types';
 import type { LawResult } from '@law/types';
 import type { LatticeState } from '@lattice/types';
+import type { TypeCheckDiagnostic } from '@law/typecheck';
 
 export interface Point {
   readonly x: number;
@@ -50,4 +51,30 @@ export interface MeshView {
   readonly bounds: Rect;
 }
 
+export interface CanvasState {
+  readonly offset: Point;
+  readonly zoom: number;
+  readonly selectedNodeId: string | null;
+  readonly editingNodeId: string | null;
+}
+
+export interface ExpressionNodeView extends NodeView {
+  readonly expression: string;
+  readonly typeStatus: 'unchecked' | 'valid' | 'invalid';
+  readonly typeError: string | null;
+  readonly inferredType: string | null;
+}
+
+export type MeshViewV2 = {
+  readonly nodes: ReadonlyArray<ExpressionNodeView>;
+  readonly edges: ReadonlyArray<EdgeView>;
+  readonly bounds: Rect;
+};
+
 export type MeshProjectionFn = (state: LatticeState) => LawResult<MeshView>;
+
+export type MeshProjectionV2Fn = (
+  state: LatticeState,
+  expressions: ReadonlyMap<string, string>,
+  diagnostics: ReadonlyMap<string, TypeCheckDiagnostic>,
+) => LawResult<MeshViewV2>;

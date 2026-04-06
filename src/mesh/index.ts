@@ -7,6 +7,10 @@ export type {
   EdgeView,
   MeshView,
   MeshProjectionFn,
+  CanvasState,
+  ExpressionNodeView,
+  MeshViewV2,
+  MeshProjectionV2Fn,
 } from './types';
 
 export {
@@ -31,11 +35,14 @@ export { renderBooleanField } from './renderers/boolean';
 export { renderObjectField } from './renderers/object';
 export { renderArrayField } from './renderers/array';
 
-export { projectMesh } from './projector';
+export { projectMesh, projectMeshV2, KIND_COLORS } from './projector';
 
 export { useMeshProjection } from './hooks/useMeshProjection';
+export { useInfiniteCanvas } from './hooks/useInfiniteCanvas';
+export { useTypeCheckStatus } from './hooks/useTypeCheckStatus';
 
 export { MeshCanvas } from './components/MeshCanvas';
-export { NodeView as NodeViewComponent } from './components/NodeView';
+export { NodeViewComponent } from './components/NodeView';
 export { EdgeView as EdgeViewComponent } from './components/EdgeView';
 export { FieldViewComponent } from './components/FieldView';
+export { ExpressionEditor } from './components/ExpressionEditor';

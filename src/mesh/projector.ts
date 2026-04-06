@@ -1,6 +1,7 @@
 import type { LatticeState, LatticeNode } from '@lattice/types';
 import type { LawResult } from '@law/types';
-import type { NodeView, EdgeView, MeshView, FieldView } from './types';
+import type { TypeCheckDiagnostic } from '@law/typecheck';
+import type { NodeView, EdgeView, MeshView, MeshViewV2, FieldView, ExpressionNodeView } from './types';
 import { computeLayout } from './layout';
 import { computeBezierPath, computeBounds } from './geometry';
 import { renderStringField } from './renderers/string';
@@ -162,5 +163,55 @@ export function projectMesh(state: LatticeState): LawResult<MeshView> {
   return {
     ok: true,
     value: { nodes, edges, bounds },
+  };
+}
+
+export { KIND_COLORS };
+
+export function projectMeshV2(
+  state: LatticeState,
+  expressions: ReadonlyMap<string, string>,
+  diagnostics: ReadonlyMap<string, TypeCheckDiagnostic>,
+): LawResult<MeshViewV2> {
+  const nodeList = Array.from(state.nodes.values());
+  const layoutRects = computeLayout(nodeList, state.connections);
+
+  const layoutMap = new Map<string, { readonly x: number; readonly y: number; readonly width: number; readonly height: number }>();
+  const entries = Array.from(layoutRects.entries());
+  for (let i = 0; i < entries.length; i++) {
+    const [nodeId, rect] = entries[i]!;
+    layoutMap.set(nodeId as string, rect);
+  }
+
+  const baseNodes = buildNodeViews(state, layoutMap);
+  const edges = buildEdgeViews(state, baseNodes);
+
+  const exprNodes: ExpressionNodeView[] = [];
+  for (let i = 0; i < baseNodes.length; i++) {
+    const base = baseNodes[i]!;
+    const expression = expressions.get(base.id) ?? '';
+    const diag = diagnostics.get(base.id);
+    let typeStatus: ExpressionNodeView['typeStatus'] = 'unchecked';
+    let typeError: string | null = null;
+    let inferredType: string | null = null;
+    if (diag !== undefined) {
+      typeStatus = diag.isValid ? 'valid' : 'invalid';
+      typeError = diag.error ?? null;
+      inferredType = diag.inferredType ?? null;
+    }
+    exprNodes.push({
+      ...base,
+      expression,
+      typeStatus,
+      typeError,
+      inferredType,
+    });
+  }
+
+  const bounds = computeBounds(baseNodes);
+
+  return {
+    ok: true,
+    value: { nodes: exprNodes, edges, bounds },
   };
 }
