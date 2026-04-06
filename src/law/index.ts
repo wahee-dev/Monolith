@@ -5,6 +5,7 @@ export type {
   GovernanceLedger,
   LawResult,
   LawError,
+  TypeCheckDiagnostic,
 } from './types';
 
 export { generateSigningKey, getSigningKey, signToken, verifySignature, hashEntry, uuidV7 } from './crypto';
@@ -19,4 +20,4 @@ export type { CapabilityDefinition } from './capability';
 export { guard } from './guard';
 
 export { typecheckExpression, typecheckNodeExpressions, guardTypeCheck } from './typecheck';
-export type { TypeCheckDiagnostic, NodeTypeCheckResult } from './typecheck';
+export type { NodeTypeCheckResult } from './typecheck';

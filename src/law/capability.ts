@@ -12,6 +12,7 @@ export const CAPABILITY_REGISTRY: ReadonlyMap<CapabilityName, CapabilityDefiniti
   ['lattice:transition:initiate', { description: 'Initiate a lattice state transition', requiresProof: true }],
   ['lattice:transition:commit', { description: 'Commit a lattice state transition', requiresProof: true }],
   ['lattice:transition:rollback', { description: 'Rollback a lattice state transition', requiresProof: true }],
+  ['lattice:typecheck:validate', { description: 'Validate type-checking of lattice node expressions', requiresProof: false }],
   ['mesh:render:project', { description: 'Project lattice state to mesh view', requiresProof: false }],
   ['mesh:render:update', { description: 'Update the mesh view rendering', requiresProof: false }],
   ['system:bootstrap', { description: 'Bootstrap the Monolith system', requiresProof: true }],

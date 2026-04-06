@@ -1,5 +1,3 @@
-import type { TypeCheckDiagnostic } from './typecheck';
-
 export type CapabilityName =
   | 'lattice:transition:initiate'
   | 'lattice:transition:commit'
@@ -43,4 +41,12 @@ export interface LawError {
   readonly message: string;
   readonly capability?: CapabilityName;
   readonly diagnostics?: ReadonlyArray<TypeCheckDiagnostic>;
+}
+
+export interface TypeCheckDiagnostic {
+  readonly nodeId: string;
+  readonly expression: string;
+  readonly isValid: boolean;
+  readonly error?: string;
+  readonly inferredType?: string;
 }

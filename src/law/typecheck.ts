@@ -1,14 +1,6 @@
-import type { LawResult } from './types';
-import type { ExpressionType } from '@lattice/expression/ast';
+import type { LawResult, TypeCheckDiagnostic, PermissionToken, GovernanceLedger } from './types';
 import { parseAndTypeCheck } from '@lattice/expression';
-
-export interface TypeCheckDiagnostic {
-  readonly nodeId: string;
-  readonly expression: string;
-  readonly isValid: boolean;
-  readonly error?: string;
-  readonly inferredType?: ExpressionType;
-}
+import { guard } from './guard';
 
 export interface NodeTypeCheckResult {
   readonly diagnostics: ReadonlyArray<TypeCheckDiagnostic>;
@@ -78,7 +70,14 @@ export function typecheckNodeExpressions(
 
 export function guardTypeCheck(
   expressions: ReadonlyMap<string, string>,
+  token: PermissionToken | undefined,
+  ledger: GovernanceLedger,
 ): LawResult<NodeTypeCheckResult> {
+  const authResult = guard('lattice:typecheck:validate', token, ledger);
+  if (!authResult.ok) {
+    return authResult;
+  }
+
   const result = typecheckNodeExpressions(expressions);
 
   if (result.allValid) {
@@ -90,8 +89,9 @@ export function guardTypeCheck(
   return {
     ok: false,
     error: {
-      code: 'TOKEN_INVALID',
+      code: 'TYPE_MISMATCH',
       message: `Type-check failed for ${invalidDiagnostics.length} expression(s)`,
+      capability: 'lattice:typecheck:validate',
       diagnostics: invalidDiagnostics,
     },
   };
