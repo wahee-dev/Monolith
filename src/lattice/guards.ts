@@ -1,32 +1,32 @@
 import { guard } from '@law/guard';
 import type { CapabilityName, GovernanceLedger, PermissionToken } from '@law/types';
 
-export function checkPermission(
+export async function checkPermission(
   capability: CapabilityName,
   token: PermissionToken | undefined,
   ledger: GovernanceLedger,
-): boolean {
-  const result = guard(capability, token, ledger);
+): Promise<boolean> {
+  const result = await guard(capability, token, ledger);
   return result.ok;
 }
 
-export function hasInitiatePermission(
+export async function hasInitiatePermission(
   token: PermissionToken | undefined,
   ledger: GovernanceLedger,
-): boolean {
+): Promise<boolean> {
   return checkPermission('lattice:transition:initiate', token, ledger);
 }
 
-export function hasCommitPermission(
+export async function hasCommitPermission(
   token: PermissionToken | undefined,
   ledger: GovernanceLedger,
-): boolean {
+): Promise<boolean> {
   return checkPermission('lattice:transition:commit', token, ledger);
 }
 
-export function hasRollbackPermission(
+export async function hasRollbackPermission(
   token: PermissionToken | undefined,
   ledger: GovernanceLedger,
-): boolean {
+): Promise<boolean> {
   return checkPermission('lattice:transition:rollback', token, ledger);
 }

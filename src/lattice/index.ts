@@ -36,7 +36,6 @@ export {
   setNodeValue,
   captureSnapshot,
   clearSnapshot,
-  resetState,
   validateState,
 } from './actions';
 

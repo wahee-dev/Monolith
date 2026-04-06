@@ -2,11 +2,11 @@ import type { CapabilityName, PermissionToken, GovernanceLedger, LawResult } fro
 import { validateToken } from './token';
 import { checkCapability } from './capability';
 
-export function guard(
+export async function guard(
   capability: CapabilityName,
   token: PermissionToken | undefined,
   ledger: GovernanceLedger,
-): LawResult<PermissionToken> {
+): Promise<LawResult<PermissionToken>> {
   if (token === undefined) {
     return {
       ok: false,
@@ -18,7 +18,7 @@ export function guard(
     };
   }
 
-  const validationResult = validateToken(token, ledger);
+  const validationResult = await validateToken(token, ledger);
   if (!validationResult.ok) {
     return validationResult;
   }

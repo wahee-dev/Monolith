@@ -1,4 +1,5 @@
 import type { LatticeState, LatticeStatus, LatticeNode, LatticeConnection, LatticeNodeId } from './types';
+import type { LawResult } from '@law/types';
 import type { SnapshotState } from './context';
 
 export function updateStatus(state: LatticeState, status: LatticeStatus): LatticeState {
@@ -74,28 +75,24 @@ export function clearSnapshot(): SnapshotState {
   return { status: 'empty' };
 }
 
-export function resetState(): LatticeState {
-  return {
-    nodes: new Map(),
-    connections: [],
-    values: new Map(),
-    status: 'idle',
-    version: 0,
-  };
-}
-
-export function validateState(state: LatticeState): { readonly ok: true; readonly value: LatticeState } | { readonly ok: false; readonly reason: string } {
+export function validateState(state: LatticeState): LawResult<LatticeState> {
   for (const connection of state.connections) {
     if (!state.nodes.has(connection.from)) {
       return {
         ok: false,
-        reason: `Connection '${connection.id}' references unknown source node '${connection.from as string}'`,
+        error: {
+          code: 'VALIDATION_ERROR',
+          message: `Connection '${connection.id}' references unknown source node '${connection.from as string}'`,
+        },
       };
     }
     if (!state.nodes.has(connection.to)) {
       return {
         ok: false,
-        reason: `Connection '${connection.id}' references unknown target node '${connection.to as string}'`,
+        error: {
+          code: 'VALIDATION_ERROR',
+          message: `Connection '${connection.id}' references unknown target node '${connection.to as string}'`,
+        },
       };
     }
   }

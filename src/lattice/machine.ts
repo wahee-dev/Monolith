@@ -2,11 +2,11 @@ import { setup, assign } from 'xstate';
 import type { LatticeMachineContext } from './context';
 import type { LatticeEvent } from './events';
 import type { LatticeState } from './types';
+import type { LawResult } from '@law/types';
 import { updateStatus, validateState } from './actions';
 import { addNode, removeNode, addConnection, removeConnection, setNodeValue } from './actions';
 import { executeNode } from './nodes';
-import { hasInitiatePermission } from './guards';
-import { createInitialContext } from './context';
+import { createInitialContext, createEmptyLatticeState } from './context';
 
 type EventWithToken = Extract<
   LatticeEvent,
@@ -17,37 +17,37 @@ function tryApplyTransition(
   currentState: LatticeState,
   event: LatticeEvent,
 ): LatticeState {
-  let applied: { readonly ok: true; readonly state: LatticeState } | { readonly ok: false; readonly reason: string };
+  let applied: LawResult<LatticeState>;
 
   switch (event.type) {
     case 'LATTICE.ADD_NODE':
-      applied = { ok: true, state: addNode(currentState, event.node) };
+      applied = { ok: true, value: addNode(currentState, event.node) };
       break;
     case 'LATTICE.REMOVE_NODE':
-      applied = { ok: true, state: removeNode(currentState, event.nodeId) };
+      applied = { ok: true, value: removeNode(currentState, event.nodeId) };
       break;
     case 'LATTICE.ADD_CONNECTION':
-      applied = { ok: true, state: addConnection(currentState, event.connection) };
+      applied = { ok: true, value: addConnection(currentState, event.connection) };
       break;
     case 'LATTICE.REMOVE_CONNECTION':
-      applied = { ok: true, state: removeConnection(currentState, event.connectionId) };
+      applied = { ok: true, value: removeConnection(currentState, event.connectionId) };
       break;
     case 'LATTICE.EXECUTE_NODE': {
       const node = currentState.nodes.get(event.nodeId);
       if (node === undefined) {
-        applied = { ok: false, reason: `Node not found` };
+        applied = { ok: false, error: { code: 'VALIDATION_ERROR', message: 'Node not found' } };
       } else {
         const result = executeNode(node, event.input);
         if (!result.ok) {
-          applied = { ok: false, reason: result.error.message };
+          applied = { ok: false, error: result.error };
         } else {
-          applied = { ok: true, state: setNodeValue(currentState, event.nodeId, result.value) };
+          applied = { ok: true, value: setNodeValue(currentState, event.nodeId, result.value) };
         }
       }
       break;
     }
     default:
-      applied = { ok: false, reason: `Event '${event.type}' is not a mutating transition` };
+      applied = { ok: false, error: { code: 'VALIDATION_ERROR', message: `Event '${event.type}' is not a mutating transition` } };
       break;
   }
 
@@ -55,7 +55,7 @@ function tryApplyTransition(
     return { ...currentState, status: 'rolledback', version: currentState.version + 1 };
   }
 
-  const validated = validateState(applied.state);
+  const validated = validateState(applied.value);
   if (!validated.ok) {
     return { ...currentState, status: 'rolledback', version: currentState.version + 1 };
   }
@@ -69,10 +69,8 @@ export const latticeSetup = setup({
     events: {} as LatticeEvent,
   },
   guards: {
-    hasPermission: ({ context, event }): boolean => {
-      if (!('token' in event)) return false;
-      const typedEvent = event as EventWithToken;
-      return hasInitiatePermission(typedEvent.token, context.ledger);
+    hasToken: ({ event }): boolean => {
+      return 'token' in event && (event as EventWithToken).token !== undefined;
     },
     isCommitted: ({ context }): boolean => context.state.status === 'committed',
   },
@@ -103,18 +101,14 @@ export const latticeSetup = setup({
       }),
     }),
     resetToIdle: assign({
-      state: (): LatticeState => ({
-        nodes: new Map(),
-        connections: [],
-        values: new Map(),
-        status: 'idle',
-        version: 0,
-      }),
+      state: (): LatticeState => createEmptyLatticeState(),
     }),
   },
 });
 
-export function createLatticeMachine(ledger: Parameters<typeof createInitialContext>[0]) {
+export function createLatticeMachine(
+  ledger: Parameters<typeof createInitialContext>[0],
+): ReturnType<typeof latticeSetup.createMachine> {
   return latticeSetup.createMachine({
     id: 'lattice',
     initial: 'idle',
@@ -131,7 +125,7 @@ export function createLatticeMachine(ledger: Parameters<typeof createInitialCont
       ready: {
         on: {
           'LATTICE.START': {
-            guard: 'hasPermission',
+            guard: 'hasToken',
             target: 'running',
             actions: 'setStatusRunning',
           },
@@ -140,28 +134,28 @@ export function createLatticeMachine(ledger: Parameters<typeof createInitialCont
       running: {
         on: {
           'LATTICE.PAUSE': {
-            guard: 'hasPermission',
+            guard: 'hasToken',
             target: 'paused',
             actions: 'setStatusPaused',
           },
           'LATTICE.ADD_NODE': {
-            guard: 'hasPermission',
+            guard: 'hasToken',
             target: 'transitioning',
           },
           'LATTICE.REMOVE_NODE': {
-            guard: 'hasPermission',
+            guard: 'hasToken',
             target: 'transitioning',
           },
           'LATTICE.ADD_CONNECTION': {
-            guard: 'hasPermission',
+            guard: 'hasToken',
             target: 'transitioning',
           },
           'LATTICE.REMOVE_CONNECTION': {
-            guard: 'hasPermission',
+            guard: 'hasToken',
             target: 'transitioning',
           },
           'LATTICE.EXECUTE_NODE': {
-            guard: 'hasPermission',
+            guard: 'hasToken',
             target: 'transitioning',
           },
           'LATTICE.RESET': {
@@ -173,7 +167,7 @@ export function createLatticeMachine(ledger: Parameters<typeof createInitialCont
       paused: {
         on: {
           'LATTICE.RESUME': {
-            guard: 'hasPermission',
+            guard: 'hasToken',
             target: 'running',
             actions: 'setStatusRunning',
           },

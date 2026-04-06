@@ -1,4 +1,4 @@
-import type { PermissionToken } from '@law/types';
+import type { PermissionToken, LawError } from '@law/types';
 
 export type LatticeNodeId = string & { readonly __brand: unique symbol };
 
@@ -57,4 +57,4 @@ export interface LatticeConnection {
 
 export type TransitionResult =
   | { readonly status: 'committed'; readonly state: LatticeState; readonly token: PermissionToken }
-  | { readonly status: 'rolledback'; readonly reason: string; readonly originalState: LatticeState };
+  | { readonly status: 'rolledback'; readonly error: LawError; readonly originalState: LatticeState };

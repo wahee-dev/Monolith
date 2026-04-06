@@ -1,5 +1,5 @@
 import type { PermissionToken, GovernanceLedger, LawResult, CapabilityName } from './types';
-import { getSigningKey, signToken } from './crypto';
+import { getSigningKey, signToken, verifySignature } from './crypto';
 import { findToken, isTokenRevoked, appendEntry } from './ledger';
 import { uuidV7 } from './crypto';
 
@@ -39,10 +39,10 @@ export async function createToken(params: {
   }
 }
 
-export function validateToken(
+export async function validateToken(
   token: PermissionToken,
   ledger: GovernanceLedger,
-): LawResult<PermissionToken> {
+): Promise<LawResult<PermissionToken>> {
   const now = Date.now();
 
   if (token.expiresAt <= now) {
@@ -78,9 +78,28 @@ export function validateToken(
     };
   }
 
-  const entry = findToken(token.id, ledger);
-  if (entry === undefined) {
-    return { ok: true, value: token };
+  try {
+    const key = await getSigningKey();
+    const isValid = await verifySignature(token, key, token.signature);
+    if (!isValid) {
+      return {
+        ok: false,
+        error: {
+          code: 'TOKEN_INVALID',
+          message: `Token ${token.id} has invalid signature`,
+          capability: token.capability,
+        },
+      };
+    }
+  } catch {
+    return {
+      ok: false,
+      error: {
+        code: 'CRYPTO_FAILURE',
+        message: `Failed to verify signature for token ${token.id}`,
+        capability: token.capability,
+      },
+    };
   }
 
   return { ok: true, value: token };
@@ -90,9 +109,9 @@ export async function revokeToken(
   tokenId: string,
   ledger: GovernanceLedger,
 ): Promise<LawResult<GovernanceLedger>> {
-  const entry = findToken(tokenId, ledger);
+  const found = findToken(tokenId, ledger);
 
-  if (entry === undefined) {
+  if (!found.ok) {
     return {
       ok: false,
       error: {
@@ -102,7 +121,7 @@ export async function revokeToken(
     };
   }
 
-  if (entry.action === 'revoked') {
+  if (found.value.action === 'revoked') {
     return {
       ok: false,
       error: {
@@ -112,5 +131,5 @@ export async function revokeToken(
     };
   }
 
-  return appendEntry(ledger, entry.token, 'revoked');
+  return appendEntry(ledger, found.value.token, 'revoked');
 }

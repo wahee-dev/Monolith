@@ -113,13 +113,19 @@ export async function verifyIntegrity(
 export function findToken(
   tokenId: string,
   ledger: GovernanceLedger,
-): LedgerEntry | undefined {
+): LawResult<LedgerEntry> {
   for (const entry of ledger.entries) {
     if (entry.token.id === tokenId) {
-      return entry;
+      return { ok: true, value: entry };
     }
   }
-  return undefined;
+  return {
+    ok: false,
+    error: {
+      code: 'TOKEN_MISSING',
+      message: `Token '${tokenId}' not found in ledger`,
+    },
+  };
 }
 
 export function isTokenRevoked(

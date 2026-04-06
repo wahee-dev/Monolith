@@ -92,7 +92,7 @@ function fromDeserialized(
     return {
       ok: false,
       error: {
-        code: 'TOKEN_INVALID',
+        code: 'VALIDATION_ERROR',
         message: 'Invalid state: version must be a number',
       },
     };
@@ -105,7 +105,7 @@ function fromDeserialized(
     return {
       ok: false,
       error: {
-        code: 'TOKEN_INVALID',
+        code: 'VALIDATION_ERROR',
         message: `Invalid state: unknown status '${String(serialized.status)}'`,
       },
     };
@@ -159,7 +159,7 @@ export function deserializeState(json: string): LawResult<LatticeState> {
     return {
       ok: false,
       error: {
-        code: 'TOKEN_INVALID',
+        code: 'VALIDATION_ERROR',
         message: 'Failed to parse JSON',
       },
     };
@@ -169,7 +169,7 @@ export function deserializeState(json: string): LawResult<LatticeState> {
     return {
       ok: false,
       error: {
-        code: 'TOKEN_INVALID',
+        code: 'VALIDATION_ERROR',
         message: 'Invalid state: expected an object',
       },
     };
@@ -180,7 +180,7 @@ export function deserializeState(json: string): LawResult<LatticeState> {
     return {
       ok: false,
       error: {
-        code: 'TOKEN_INVALID',
+        code: 'VALIDATION_ERROR',
         message: 'Invalid state: nodes must be an array',
       },
     };
@@ -189,7 +189,7 @@ export function deserializeState(json: string): LawResult<LatticeState> {
     return {
       ok: false,
       error: {
-        code: 'TOKEN_INVALID',
+        code: 'VALIDATION_ERROR',
         message: 'Invalid state: connections must be an array',
       },
     };
@@ -198,7 +198,7 @@ export function deserializeState(json: string): LawResult<LatticeState> {
     return {
       ok: false,
       error: {
-        code: 'TOKEN_INVALID',
+        code: 'VALIDATION_ERROR',
         message: 'Invalid state: values must be an array',
       },
     };
@@ -207,7 +207,7 @@ export function deserializeState(json: string): LawResult<LatticeState> {
     return {
       ok: false,
       error: {
-        code: 'TOKEN_INVALID',
+        code: 'VALIDATION_ERROR',
         message: 'Invalid state: status must be a string',
       },
     };
@@ -216,7 +216,7 @@ export function deserializeState(json: string): LawResult<LatticeState> {
     return {
       ok: false,
       error: {
-        code: 'TOKEN_INVALID',
+        code: 'VALIDATION_ERROR',
         message: 'Invalid state: version must be a number',
       },
     };

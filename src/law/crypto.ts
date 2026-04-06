@@ -1,6 +1,10 @@
 import type { PermissionToken, LedgerEntry } from './types';
 
-let signingKey: CryptoKey | null = null;
+let keyPromise: Promise<CryptoKey> = crypto.subtle.generateKey(
+  { name: 'HMAC', hash: 'SHA-256' },
+  false,
+  ['sign', 'verify'],
+);
 
 export async function generateSigningKey(): Promise<CryptoKey> {
   const key = await crypto.subtle.generateKey(
@@ -8,15 +12,12 @@ export async function generateSigningKey(): Promise<CryptoKey> {
     false,
     ['sign', 'verify'],
   );
-  signingKey = key;
+  keyPromise = Promise.resolve(key);
   return key;
 }
 
-export async function getSigningKey(): Promise<CryptoKey> {
-  if (signingKey === null) {
-    return generateSigningKey();
-  }
-  return signingKey;
+export function getSigningKey(): Promise<CryptoKey> {
+  return keyPromise;
 }
 
 function serializeTokenData(token: {
@@ -50,6 +51,17 @@ export async function signToken(
     .join('');
 }
 
+function constantTimeEquals(a: string, b: string): boolean {
+  if (a.length !== b.length) {
+    return false;
+  }
+  let result = 0;
+  for (let i = 0; i < a.length; i++) {
+    result |= a.charCodeAt(i) ^ b.charCodeAt(i);
+  }
+  return result === 0;
+}
+
 export async function verifySignature(
   token: PermissionToken,
   key: CryptoKey,
@@ -64,7 +76,7 @@ export async function verifySignature(
     expiresAt: token.expiresAt,
   };
   const expected = await signToken(tokenData, key);
-  return expected === signature;
+  return constantTimeEquals(expected, signature);
 }
 
 export async function hashEntry(entry: LedgerEntry): Promise<string> {

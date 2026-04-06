@@ -1,5 +1,5 @@
-import type { GovernanceLedger, PermissionToken } from '@law/types';
-import type { LatticeState } from './types';
+import type { GovernanceLedger, PermissionToken, LawResult } from '@law/types';
+import type { LatticeState, TransitionResult } from './types';
 import type { LatticeEvent } from './events';
 import { guard } from '@law/guard';
 import { executeNode } from './nodes';
@@ -8,29 +8,32 @@ import { addNode, removeNode, addConnection, removeConnection, setNodeValue, val
 export function applyEvent(
   state: LatticeState,
   event: LatticeEvent,
-): { readonly ok: true; readonly state: LatticeState } | { readonly ok: false; readonly reason: string } {
+): LawResult<LatticeState> {
   switch (event.type) {
     case 'LATTICE.ADD_NODE':
-      return { ok: true, state: addNode(state, event.node) };
+      return { ok: true, value: addNode(state, event.node) };
     case 'LATTICE.REMOVE_NODE':
-      return { ok: true, state: removeNode(state, event.nodeId) };
+      return { ok: true, value: removeNode(state, event.nodeId) };
     case 'LATTICE.ADD_CONNECTION':
-      return { ok: true, state: addConnection(state, event.connection) };
+      return { ok: true, value: addConnection(state, event.connection) };
     case 'LATTICE.REMOVE_CONNECTION':
-      return { ok: true, state: removeConnection(state, event.connectionId) };
+      return { ok: true, value: removeConnection(state, event.connectionId) };
     case 'LATTICE.EXECUTE_NODE': {
       const node = state.nodes.get(event.nodeId);
       if (node === undefined) {
         return {
           ok: false,
-          reason: `Node '${event.nodeId as string}' not found in lattice`,
+          error: {
+            code: 'VALIDATION_ERROR',
+            message: `Node '${event.nodeId as string}' not found in lattice`,
+          },
         };
       }
       const result = executeNode(node, event.input);
       if (!result.ok) {
-        return { ok: false, reason: result.error.message };
+        return { ok: false, error: result.error };
       }
-      return { ok: true, state: setNodeValue(state, event.nodeId, result.value) };
+      return { ok: true, value: setNodeValue(state, event.nodeId, result.value) };
     }
     case 'LATTICE.INITIALIZE':
     case 'LATTICE.START':
@@ -40,43 +43,31 @@ export function applyEvent(
     case 'LATTICE.ROLLBACK':
     case 'LATTICE.RESET':
     case 'LATTICE.ERROR':
-      return { ok: true, state };
+      return { ok: true, value: state };
   }
 }
 
-export function initiateTransition(
+export async function initiateTransition(
   state: LatticeState,
   event: LatticeEvent,
   token: PermissionToken,
   ledger: GovernanceLedger,
-): { readonly status: 'committed'; readonly state: LatticeState; readonly token: PermissionToken } | { readonly status: 'rolledback'; readonly reason: string; readonly originalState: LatticeState } {
-  const guardResult = guard('lattice:transition:initiate', token, ledger);
+): Promise<TransitionResult> {
+  const guardResult = await guard('lattice:transition:initiate', token, ledger);
   if (!guardResult.ok) {
-    return {
-      status: 'rolledback',
-      reason: guardResult.error.message,
-      originalState: state,
-    };
+    return { status: 'rolledback', error: guardResult.error, originalState: state };
   }
 
   const snapshot = state;
 
   const applied = applyEvent(state, event);
   if (!applied.ok) {
-    return {
-      status: 'rolledback',
-      reason: applied.reason,
-      originalState: snapshot,
-    };
+    return { status: 'rolledback', error: applied.error, originalState: snapshot };
   }
 
-  const validated = validateState(applied.state);
+  const validated = validateState(applied.value);
   if (!validated.ok) {
-    return {
-      status: 'rolledback',
-      reason: validated.reason,
-      originalState: snapshot,
-    };
+    return { status: 'rolledback', error: validated.error, originalState: snapshot };
   }
 
   return {

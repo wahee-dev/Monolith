@@ -31,7 +31,7 @@ function validateInput(
       return {
         ok: false,
         error: {
-          code: 'TOKEN_INVALID',
+          code: 'VALIDATION_ERROR',
           message: `Missing required input field '${field.name}' of type '${field.type}' for node '${node.id as string}'`,
         },
       };
@@ -40,7 +40,7 @@ function validateInput(
       return {
         ok: false,
         error: {
-          code: 'TOKEN_INVALID',
+          code: 'VALIDATION_ERROR',
           message: `Input field '${field.name}' expected type '${field.type}' but received '${typeof value}' for node '${node.id as string}'`,
         },
       };
@@ -150,8 +150,8 @@ export function executeNode(
       return {
         ok: false,
         error: {
-          code: 'TOKEN_INVALID',
-          message: `Unknown node kind '${node.kind}' for node '${node.id as string}'`,
+        code: 'VALIDATION_ERROR',
+        message: `Unknown node kind '${node.kind}' for node '${node.id as string}'`,
         },
       };
   }
