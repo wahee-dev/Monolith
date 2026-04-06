@@ -1,4 +1,18 @@
-import type { TypeCheckDiagnostic } from './typecheck';
+import type { ExpressionType } from '@lattice/expression/ast';
+
+export interface TypeCheckDiagnostic {
+  readonly nodeId: string;
+  readonly expression: string;
+  readonly isValid: boolean;
+  readonly error?: string;
+  readonly inferredType?: ExpressionType;
+}
+
+export interface NodeTypeCheckResult {
+  readonly diagnostics: ReadonlyArray<TypeCheckDiagnostic>;
+  readonly allValid: boolean;
+  readonly checkedAt: number;
+}
 
 export type CapabilityName =
   | 'lattice:transition:initiate'

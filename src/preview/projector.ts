@@ -91,17 +91,6 @@ function buildScreenForSinkNode(node: LatticeNode): ShadowScreen {
   };
 }
 
-function validateExpression(
-  nodeId: string,
-  expression: string,
-): PreviewError | null {
-  const result = parseAndTypeCheck(expression);
-  if (!result.ok) {
-    return { nodeId, message: result.error.message };
-  }
-  return null;
-}
-
 function buildDataFlows(
   connections: ReadonlyArray<{
     readonly id: string;
@@ -153,9 +142,9 @@ export function projectShadowApp(
 
     const expression = expressions.get(nodeIdStr);
     if (expression !== undefined && expression.length > 0) {
-      const error = validateExpression(nodeIdStr, expression);
-      if (error !== null) {
-        errors.push(error);
+      const result = parseAndTypeCheck(expression);
+      if (!result.ok) {
+        errors.push({ nodeId: nodeIdStr, message: result.error.message });
       }
     }
   }
