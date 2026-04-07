@@ -4,6 +4,7 @@ import { useCallback, useMemo } from 'react';
 import type { MeshView, Point } from '../types';
 import { useInfiniteCanvas } from '../hooks/useInfiniteCanvas';
 import { useNodeDrag } from '../hooks/useNodeDrag';
+import { useConnectionDrag } from '../hooks/useConnectionDrag';
 import { NodeView as NodeViewComponent } from './NodeView';
 import { EdgeView } from './EdgeView';
 import { ExpressionEditor } from './ExpressionEditor';
@@ -12,6 +13,7 @@ import { computeBezierPath } from '../geometry';
 interface MeshCanvasProps {
   readonly view: MeshView;
   readonly selectedNodeId: string | null;
+  readonly selectedEdgeId: string | null;
   readonly editingNodeId: string | null;
   readonly nodePositions: ReadonlyMap<string, Point>;
   readonly isBlocking: boolean;
@@ -20,6 +22,14 @@ interface MeshCanvasProps {
   readonly onNodeDoubleClick: (nodeId: string) => void;
   readonly onExpressionCommit: (nodeId: string, expression: string) => void;
   readonly onExpressionCancel: () => void;
+  readonly onConnectionCreate: (fromNodeId: string, fromPort: string, toNodeId: string, toPort: string) => void;
+  readonly onEdgeSelect: (edgeId: string | null) => void;
+  readonly existingConnections: ReadonlyArray<{
+    readonly from: string;
+    readonly to: string;
+    readonly fromPort: string;
+    readonly toPort: string;
+  }>;
 }
 
 function buildGridDefs(): React.ReactElement {
@@ -59,6 +69,7 @@ function buildGridDefs(): React.ReactElement {
 export function MeshCanvas({
   view,
   selectedNodeId,
+  selectedEdgeId,
   editingNodeId,
   nodePositions,
   isBlocking,
@@ -67,6 +78,9 @@ export function MeshCanvas({
   onNodeDoubleClick,
   onExpressionCommit,
   onExpressionCancel,
+  onConnectionCreate,
+  onEdgeSelect,
+  existingConnections,
 }: MeshCanvasProps): React.ReactElement {
   const svgW = typeof window !== 'undefined' ? window.innerWidth : 800;
   const svgH = typeof window !== 'undefined' ? window.innerHeight : 600;
@@ -75,6 +89,11 @@ export function MeshCanvas({
     canvasState: canvas.canvasState,
     nodePositions,
     onNodeMove,
+  });
+  const connDrag = useConnectionDrag({
+    screenToWorld: canvas.screenToWorld,
+    existingConnections,
+    onConnectionCreate,
   });
 
   const positionedNodes = useMemo(() => {
@@ -121,16 +140,18 @@ export function MeshCanvas({
     (e: React.MouseEvent<SVGSVGElement>): void => {
       canvas.svgProps.onMouseMove(e);
       drag.onCanvasMouseMove(e);
+      connDrag.onCanvasMouseMove(e);
     },
-    [canvas.svgProps, drag],
+    [canvas.svgProps, drag, connDrag],
   );
 
   const handleSvgMouseUp = useCallback(
     (e: React.MouseEvent<SVGSVGElement>): void => {
       canvas.svgProps.onMouseUp(e);
       drag.onCanvasMouseUp();
+      connDrag.onCanvasMouseUp();
     },
-    [canvas.svgProps, drag],
+    [canvas.svgProps, drag, connDrag],
   );
 
   const handleNodeMouseDown = useCallback(
@@ -140,6 +161,51 @@ export function MeshCanvas({
     },
     [onNodeSelect, drag],
   );
+
+  const handleEdgeClick = useCallback(
+    (edgeId: string, e: React.MouseEvent): void => {
+      e.stopPropagation();
+      onEdgeSelect(edgeId);
+    },
+    [onEdgeSelect],
+  );
+
+  const activeDrag = connDrag.dragState;
+
+  const dragStartPoint = useMemo((): Point | null => {
+    if (activeDrag === null) return null;
+    const sourceNode = nodeMap.get(activeDrag.sourceNodeId);
+    if (sourceNode === undefined) return null;
+    const isOutput = activeDrag.sourcePortType === 'output';
+    const portIndex = sourceNode.ports
+      .filter((p) => p.direction === activeDrag.sourcePortType)
+      .findIndex((p) => p.name === activeDrag.sourcePort);
+    if (portIndex === -1) return null;
+    const portsOfDirection = sourceNode.ports.filter((p) => p.direction === activeDrag.sourcePortType);
+    const headerHeight = 28;
+    const fieldAreaHeight = sourceNode.rect.height - headerHeight;
+    const spacing = 22;
+    const cy = sourceNode.rect.y + headerHeight + fieldAreaHeight / 2 + (portIndex - (portsOfDirection.length - 1) / 2) * spacing;
+    return {
+      x: isOutput ? sourceNode.rect.x + sourceNode.rect.width : sourceNode.rect.x,
+      y: cy,
+    };
+  }, [activeDrag, nodeMap]);
+
+  const tempEdgePath = useMemo((): string | null => {
+    if (dragStartPoint === null || activeDrag === null) return null;
+    const dx = Math.abs(activeDrag.currentPoint.x - dragStartPoint.x);
+    const offset = Math.max(dx * 0.5, 50);
+    const isOutput = activeDrag.sourcePortType === 'output';
+    const start = dragStartPoint;
+    const end = activeDrag.currentPoint;
+    const sx = start.x;
+    const sy = start.y;
+    const ex = end.x;
+    const ey = end.y;
+    const ctrlOffset = isOutput ? offset : -offset;
+    return `M ${sx} ${sy} C ${sx + ctrlOffset} ${sy}, ${ex - ctrlOffset} ${ey}, ${ex} ${ey}`;
+  }, [dragStartPoint, activeDrag]);
 
   const vb = canvas.svgProps.viewBox.split(' ');
   const vbX = Number(vb[0] ?? 0);
@@ -166,7 +232,9 @@ export function MeshCanvas({
       <rect x={vbX} y={vbY} width={vbW} height={vbH} fill="#08080f" />
       <rect x={vbX} y={vbY} width={vbW} height={vbH} fill="url(#grid-thick)" />
       {recomputedEdges.map((edge) => (
-        <EdgeView key={edge.id} edge={edge} />
+        <g key={edge.id} onClick={(e) => handleEdgeClick(edge.id, e)}>
+          <EdgeView edge={edge} isSelected={edge.id === selectedEdgeId} />
+        </g>
       ))}
       {positionedNodes.map((node) => (
         <NodeViewComponent
@@ -178,8 +246,24 @@ export function MeshCanvas({
           isBlocking={isBlocking}
           onMouseDown={(e: React.MouseEvent<SVGGElement>) => handleNodeMouseDown(node.id, e)}
           onDoubleClick={() => onNodeDoubleClick(node.id)}
+          onPortMouseDown={(portName: string, portType: 'input' | 'output', e: React.MouseEvent) =>
+            connDrag.onPortMouseDown(node.id, portName, portType, e)
+          }
+          onPortMouseUp={(portName: string, portType: 'input' | 'output') =>
+            connDrag.onPortMouseUp(node.id, portName, portType)
+          }
         />
       ))}
+      {tempEdgePath !== null && (
+        <path
+          d={tempEdgePath}
+          fill="none"
+          stroke="#00ffff"
+          strokeWidth="2"
+          strokeDasharray="6 4"
+          strokeOpacity="0.8"
+        />
+      )}
       {editingNode !== undefined && editingNodeId !== null && (
         <ExpressionEditor
           nodeId={editingNodeId}

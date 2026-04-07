@@ -11,6 +11,8 @@ interface NodeViewProps {
   readonly isBlocking: boolean;
   readonly onMouseDown: (e: React.MouseEvent<SVGGElement>) => void;
   readonly onDoubleClick: () => void;
+  readonly onPortMouseDown?: (portName: string, portType: 'input' | 'output', e: React.MouseEvent) => void;
+  readonly onPortMouseUp?: (portName: string, portType: 'input' | 'output') => void;
 }
 
 const STATUS_BORDER_COLORS: Record<string, string> = {
@@ -20,6 +22,8 @@ const STATUS_BORDER_COLORS: Record<string, string> = {
 };
 
 const PORT_RADIUS = 5;
+const PORT_SPACING = 22;
+const HEADER_HEIGHT = 28;
 
 export function NodeView({
   node,
@@ -29,8 +33,15 @@ export function NodeView({
   isBlocking,
   onMouseDown,
   onDoubleClick,
+  onPortMouseDown,
+  onPortMouseUp,
 }: NodeViewProps): React.ReactElement {
-  const { rect, label, fields, color, expression, typeStatus, typeError } = node;
+  const { rect, label, fields, ports, color, expression, typeStatus, typeError } = node;
+
+  const inputPorts = ports.filter((p) => p.direction === 'input');
+  const outputPorts = ports.filter((p) => p.direction === 'output');
+  const headerHeight = HEADER_HEIGHT;
+  const fieldAreaHeight = rect.height - headerHeight;
 
   const selectionFilter = isSelected
     ? 'url(#selection-glow)'
@@ -217,22 +228,50 @@ export function NodeView({
           {typeError.length > 30 ? `${typeError.slice(0, 30)}…` : typeError}
         </text>
       )}
-      <circle
-        cx={rect.x}
-        cy={rect.y + rect.height / 2}
-        r={PORT_RADIUS}
-        fill="#08080f"
-        stroke="#555555"
-        strokeWidth="1.5"
-      />
-      <circle
-        cx={rect.x + rect.width}
-        cy={rect.y + rect.height / 2}
-        r={PORT_RADIUS}
-        fill="#08080f"
-        stroke="#555555"
-        strokeWidth="1.5"
-      />
+      {inputPorts.map((port, idx) => {
+        const cy = rect.y + headerHeight + fieldAreaHeight / 2 + (idx - (inputPorts.length - 1) / 2) * PORT_SPACING;
+        return (
+          <circle
+            key={`in-${port.name}`}
+            cx={rect.x}
+            cy={cy}
+            r={PORT_RADIUS}
+            fill={isSelected || isDragging ? '#4a9eff' : '#08080f'}
+            stroke="#4a9eff"
+            strokeWidth="1.5"
+            style={{ cursor: 'crosshair' }}
+            onMouseDown={(e: React.MouseEvent) => {
+              e.stopPropagation();
+              onPortMouseDown?.(port.name, 'input', e);
+            }}
+            onMouseUp={() => onPortMouseUp?.(port.name, 'input')}
+          >
+            <title>{port.name} (input)</title>
+          </circle>
+        );
+      })}
+      {outputPorts.map((port, idx) => {
+        const cy = rect.y + headerHeight + fieldAreaHeight / 2 + (idx - (outputPorts.length - 1) / 2) * PORT_SPACING;
+        return (
+          <circle
+            key={`out-${port.name}`}
+            cx={rect.x + rect.width}
+            cy={cy}
+            r={PORT_RADIUS}
+            fill={isSelected || isDragging ? color : '#08080f'}
+            stroke={color}
+            strokeWidth="1.5"
+            style={{ cursor: 'crosshair' }}
+            onMouseDown={(e: React.MouseEvent) => {
+              e.stopPropagation();
+              onPortMouseDown?.(port.name, 'output', e);
+            }}
+            onMouseUp={() => onPortMouseUp?.(port.name, 'output')}
+          >
+            <title>{port.name} (output)</title>
+          </circle>
+        );
+      })}
     </g>
   );
 }

@@ -1,6 +1,6 @@
 import type { LatticeState, LatticeNode } from '@lattice/types';
 import type { LawResult } from '@law/types';
-import type { NodeView, EdgeView, MeshView, FieldView, TypeStatus } from './types';
+import type { NodeView, EdgeView, MeshView, FieldView, TypeStatus, PortInfo } from './types';
 import { computeLayout } from './layout';
 import { computeBezierPath, computeBounds } from './geometry';
 import { renderStringField } from './renderers/string';
@@ -34,6 +34,21 @@ function renderFieldByType(type: FieldView['type'], value: unknown): string {
     default:
       return String(value);
   }
+}
+
+function buildNodePorts(node: LatticeNode): ReadonlyArray<PortInfo> {
+  const ports: PortInfo[] = [];
+  const inputKeys = Object.keys(node.schema.input).sort();
+  for (let i = 0; i < inputKeys.length; i++) {
+    const key = inputKeys[i]!;
+    ports.push({ name: key, direction: 'input' });
+  }
+  const outputKeys = Object.keys(node.schema.output).sort();
+  for (let i = 0; i < outputKeys.length; i++) {
+    const key = outputKeys[i]!;
+    ports.push({ name: key, direction: 'output' });
+  }
+  return ports;
 }
 
 function buildNodeFields(
@@ -99,6 +114,7 @@ function buildNodeViews(
 
     const nodeValue = state.values.get(nodeId);
     const fields = buildNodeFields(node, nodeValue, rect);
+    const ports = buildNodePorts(node);
     const color = KIND_COLORS[node.kind] ?? '#888888';
 
     views.push({
@@ -107,6 +123,7 @@ function buildNodeViews(
       kind: node.kind,
       label: `${node.kind}::${id.slice(0, 8)}`,
       fields,
+      ports,
       color,
       expression: expressions.get(id) ?? '',
       typeStatus: typeStatusMap.get(id) ?? ('unchecked' as const),

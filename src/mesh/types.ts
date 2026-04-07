@@ -35,16 +35,29 @@ export interface CanvasState {
   readonly zoom: number;
 }
 
+export interface PortInfo {
+  readonly name: string;
+  readonly direction: 'input' | 'output';
+}
+
 export interface NodeView {
   readonly id: string;
   readonly rect: Rect;
   readonly kind: LatticeNodeKind;
   readonly label: string;
   readonly fields: ReadonlyArray<FieldView>;
+  readonly ports: ReadonlyArray<PortInfo>;
   readonly color: string;
   readonly expression: string;
   readonly typeStatus: TypeStatus;
   readonly typeError: string;
+}
+
+export interface ConnectionDragState {
+  readonly sourceNodeId: string;
+  readonly sourcePort: string;
+  readonly sourcePortType: 'input' | 'output';
+  readonly currentPoint: Point;
 }
 
 export interface EdgeView {

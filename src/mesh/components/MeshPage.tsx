@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import { createLatticeNodeId } from '@lattice/types';
-import type { LatticeState, LatticeNode, LatticeNodeId, LatticeNodeKind } from '@lattice/types';
+import type { LatticeState, LatticeNode, LatticeNodeId, LatticeNodeKind, LatticeConnection } from '@lattice/types';
 import type { Point } from '@mesh/types';
 import { parseAndTypeCheck } from '@lattice/expression';
 import { MeshCanvas, useMeshProjection } from '@mesh/index';
@@ -196,6 +196,7 @@ export default function MeshPage({ onStateChange }: MeshPageProps): React.ReactE
   );
 
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
+  const [selectedEdgeId, setSelectedEdgeId] = useState<string | null>(null);
   const [editingNodeId, setEditingNodeId] = useState<string | null>(null);
   const [executionStatus, setExecutionStatus] = useState<ExecutionStatus>('idle');
   const [errorMessage, setErrorMessage] = useState<string>('');
@@ -242,6 +243,9 @@ export default function MeshPage({ onStateChange }: MeshPageProps): React.ReactE
 
   const handleNodeSelect = useCallback((nodeId: string | null): void => {
     setSelectedNodeId(nodeId);
+    if (nodeId !== null) {
+      setSelectedEdgeId(null);
+    }
   }, []);
 
   const handleNodeDoubleClick = useCallback((nodeId: string): void => {
@@ -311,6 +315,42 @@ export default function MeshPage({ onStateChange }: MeshPageProps): React.ReactE
     setSelectedNodeId(null);
     setEditingNodeId(null);
   }, [selectedNodeId]);
+
+  const handleConnectionCreate = useCallback(
+    (fromNodeId: string, fromPort: string, toNodeId: string, toPort: string): void => {
+      const connId = `conn-${Date.now()}`;
+      const newConn: LatticeConnection = {
+        id: connId,
+        from: createLatticeNodeId(fromNodeId),
+        to: createLatticeNodeId(toNodeId),
+        fromPort,
+        toPort,
+      };
+      setState((prev) => ({
+        ...prev,
+        connections: [...prev.connections, newConn],
+        version: prev.version + 1,
+      }));
+    },
+    [],
+  );
+
+  const handleEdgeSelect = useCallback((edgeId: string | null): void => {
+    setSelectedEdgeId(edgeId);
+    if (edgeId !== null) {
+      setSelectedNodeId(null);
+    }
+  }, []);
+
+  const handleDeleteConnection = useCallback((): void => {
+    if (selectedEdgeId === null) return;
+    setState((prev) => ({
+      ...prev,
+      connections: prev.connections.filter((c) => c.id !== selectedEdgeId),
+      version: prev.version + 1,
+    }));
+    setSelectedEdgeId(null);
+  }, [selectedEdgeId]);
 
   const handleExpressionCommit = useCallback(
     (nodeId: string, expression: string): void => {
@@ -465,6 +505,14 @@ export default function MeshPage({ onStateChange }: MeshPageProps): React.ReactE
             ✕ Delete
           </span>
         )}
+        {selectedEdgeId !== null && (
+          <span
+            style={{ cursor: 'pointer', color: '#f59e0b' }}
+            onClick={handleDeleteConnection}
+          >
+            ✕ Delete Wire
+          </span>
+        )}
         <span style={{ color: '#555555' }}>|</span>
         {executionStatus === 'running' ? (
           <span
@@ -496,7 +544,7 @@ export default function MeshPage({ onStateChange }: MeshPageProps): React.ReactE
           </span>
         )}
         <span style={{ marginLeft: 'auto', color: '#555555' }}>
-          {view.nodes.length} nodes · {view.edges.length} edges
+          {view.nodes.length} nodes · {state.connections.length} wires
         </span>
       </div>
       {errorMessage.length > 0 && (
@@ -526,6 +574,7 @@ export default function MeshPage({ onStateChange }: MeshPageProps): React.ReactE
         <MeshCanvas
           view={view}
           selectedNodeId={selectedNodeId}
+          selectedEdgeId={selectedEdgeId}
           editingNodeId={editingNodeId}
           nodePositions={nodePositions}
           isBlocking={typeCheckGuard.isBlocking}
@@ -534,6 +583,14 @@ export default function MeshPage({ onStateChange }: MeshPageProps): React.ReactE
           onNodeDoubleClick={handleNodeDoubleClick}
           onExpressionCommit={handleExpressionCommit}
           onExpressionCancel={handleExpressionCancel}
+          onConnectionCreate={handleConnectionCreate}
+          onEdgeSelect={handleEdgeSelect}
+          existingConnections={state.connections.map((c) => ({
+            from: c.from as string,
+            to: c.to as string,
+            fromPort: c.fromPort,
+            toPort: c.toPort,
+          }))}
         />
       </div>
       <div style={{
