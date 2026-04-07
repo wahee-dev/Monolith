@@ -42,6 +42,9 @@
       ],
       "@inspector/*": [
         "inspector/*"
+      ],
+      "@palette/*": [
+        "palette/*"
       ]
     },
     "plugins": [
