@@ -59,3 +59,16 @@ export {
   resetExecution,
   isExecutionComplete,
 } from './execution';
+
+export {
+  topologicalSort,
+  buildEnvironment,
+  executeGraph,
+  executeSingleNode,
+} from './executor';
+
+export type { ExecutionStepStatus as SchedulerStepStatus, ExecutionStep as SchedulerExecutionStep } from './scheduler';
+export {
+  createExecutionPlan,
+  getExecutionOrder,
+} from './scheduler';
