@@ -176,7 +176,7 @@ const STATUS_BAR_LABELS: Record<ExecutionStatus, string> = {
 };
 
 export default function MeshPage({ onStateChange }: MeshPageProps): React.ReactElement {
-  const [state] = useState(() => createSampleLatticeState());
+  const [state, setState] = useState(() => createSampleLatticeState());
   const [expressions, setExpressions] = useState<Map<string, string>>(new Map());
   const [nodeTypeStatus, setNodeTypeStatus] = useState<Map<string, 'unchecked' | 'valid' | 'invalid'>>(new Map());
   const [nodeTypeErrors, setNodeTypeErrors] = useState<Map<string, string>>(new Map());
@@ -199,6 +199,7 @@ export default function MeshPage({ onStateChange }: MeshPageProps): React.ReactE
   const [editingNodeId, setEditingNodeId] = useState<string | null>(null);
   const [executionStatus, setExecutionStatus] = useState<ExecutionStatus>('idle');
   const [errorMessage, setErrorMessage] = useState<string>('');
+  const [showAddMenu, setShowAddMenu] = useState<boolean>(false);
 
   const typeCheckGuard = useTypeCheckGuard();
 
@@ -259,9 +260,8 @@ export default function MeshPage({ onStateChange }: MeshPageProps): React.ReactE
         },
       };
 
-      const lastPos = Array.from(nodePositions.values()).pop();
-      const x = (lastPos?.x ?? 80) + 250;
-      const y = lastPos?.y ?? 60;
+      const x = 200 + Math.random() * 100;
+      const y = 100 + Math.random() * 100;
 
       setNodePositions((prev) => {
         const next = new Map(prev);
@@ -269,10 +269,13 @@ export default function MeshPage({ onStateChange }: MeshPageProps): React.ReactE
         return next;
       });
 
-      void state;
-      void newNode;
+      setState((prev) => {
+        const nextNodes = new Map(prev.nodes);
+        nextNodes.set(id, newNode);
+        return { ...prev, nodes: nextNodes, version: prev.version + 1 };
+      });
     },
-    [nodePositions, state],
+    [],
   );
 
   const handleDeleteNode = useCallback((): void => {
@@ -296,6 +299,14 @@ export default function MeshPage({ onStateChange }: MeshPageProps): React.ReactE
       const next = new Map(prev);
       next.delete(selectedNodeId);
       return next;
+    });
+    setState((prev) => {
+      const nextNodes = new Map(prev.nodes);
+      nextNodes.delete(selectedNodeId as LatticeNodeId);
+      const nextConnections = prev.connections.filter(
+        (c) => c.from !== selectedNodeId && c.to !== selectedNodeId,
+      );
+      return { ...prev, nodes: nextNodes, connections: nextConnections, version: prev.version + 1 };
     });
     setSelectedNodeId(null);
     setEditingNodeId(null);
@@ -410,18 +421,24 @@ export default function MeshPage({ onStateChange }: MeshPageProps): React.ReactE
         <span>MESH</span>
         <span style={{ color: '#555555' }}>|</span>
         <div style={{ position: 'relative' }}>
-          <span style={{ cursor: 'pointer', color: '#aaaaaa' }}>+ Add Node ▾</span>
-          <div style={{
-            position: 'absolute',
-            top: '100%',
-            left: 0,
-            display: 'none',
-            backgroundColor: '#14141f',
-            border: '1px solid #2a2a3e',
-            borderRadius: '4px',
-            padding: '4px 0',
-            zIndex: 100,
-          }}>
+          <span
+            style={{ cursor: 'pointer', color: '#aaaaaa' }}
+            onClick={() => setShowAddMenu(!showAddMenu)}
+          >+ Add Node ▾</span>
+          <div
+            onMouseLeave={() => setShowAddMenu(false)}
+            style={{
+              position: 'absolute',
+              top: '100%',
+              left: 0,
+              display: showAddMenu ? 'block' : 'none',
+              backgroundColor: '#14141f',
+              border: '1px solid #2a2a3e',
+              borderRadius: '4px',
+              padding: '4px 0',
+              zIndex: 100,
+            }}
+          >
             {ALL_KINDS.map((kind) => (
               <div
                 key={kind}
@@ -430,7 +447,10 @@ export default function MeshPage({ onStateChange }: MeshPageProps): React.ReactE
                   cursor: 'pointer',
                   color: '#cccccc',
                 }}
-                onClick={() => handleAddNode(kind)}
+                onClick={() => {
+                  handleAddNode(kind);
+                  setShowAddMenu(false);
+                }}
               >
                 {kind}
               </div>
