@@ -19,6 +19,15 @@ const KIND_COLORS: Record<string, string> = {
   split: '#9fff4a',
 };
 
+const KIND_LABELS: Record<string, string> = {
+  source: 'Source',
+  transform: 'Transform',
+  sink: 'Sink',
+  gate: 'Gate',
+  merge: 'Merge',
+  split: 'Split',
+};
+
 function renderFieldByType(type: FieldView['type'], value: unknown): string {
   switch (type) {
     case 'string':
@@ -106,6 +115,14 @@ function buildNodeViews(
     (a, b) => (a[0] as string).localeCompare(b[0] as string),
   );
 
+  const kindCounters = new Map<string, number>();
+  for (const [, node] of nodeEntries) {
+    const current = kindCounters.get(node.kind) ?? 0;
+    kindCounters.set(node.kind, current + 1);
+  }
+
+  const kindRunningCounters = new Map<string, number>();
+
   for (let i = 0; i < nodeEntries.length; i++) {
     const [nodeId, node] = nodeEntries[i]!;
     const id = nodeId as string;
@@ -116,12 +133,19 @@ function buildNodeViews(
     const fields = buildNodeFields(node, nodeValue, rect);
     const ports = buildNodePorts(node);
     const color = KIND_COLORS[node.kind] ?? '#888888';
+    const runningCount = (kindRunningCounters.get(node.kind) ?? 0) + 1;
+    kindRunningCounters.set(node.kind, runningCount);
+    const kindLabel = KIND_LABELS[node.kind] ?? node.kind;
+    const totalCount = kindCounters.get(node.kind) ?? 1;
+    const label = totalCount > 1
+      ? `${kindLabel} #${runningCount}`
+      : kindLabel;
 
     views.push({
       id,
       rect,
       kind: node.kind,
-      label: `${node.kind}::${id.slice(0, 8)}`,
+      label,
       fields,
       ports,
       color,
