@@ -4,9 +4,10 @@ import type { EdgeView as EdgeViewType } from '../types';
 
 interface EdgeViewProps {
   readonly edge: EdgeViewType;
+  readonly isSelected?: boolean;
 }
 
-export function EdgeView({ edge }: EdgeViewProps): React.ReactElement {
+export function EdgeView({ edge, isSelected }: EdgeViewProps): React.ReactElement {
   const { curve } = edge;
   const path = `M ${curve.start.x} ${curve.start.y} C ${curve.control1.x} ${curve.control1.y}, ${curve.control2.x} ${curve.control2.y}, ${curve.end.x} ${curve.end.y}`;
 
@@ -18,9 +19,9 @@ export function EdgeView({ edge }: EdgeViewProps): React.ReactElement {
       <path
         d={path}
         fill="none"
-        stroke={edge.color}
-        strokeWidth="2"
-        strokeOpacity="0.6"
+        stroke={isSelected === true ? '#f59e0b' : edge.color}
+        strokeWidth={isSelected === true ? '3' : '2'}
+        strokeOpacity={isSelected === true ? '0.9' : '0.6'}
       />
       <text
         x={midX}

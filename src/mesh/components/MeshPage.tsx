@@ -1,8 +1,8 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { createLatticeNodeId } from '@lattice/types';
-import type { LatticeState, LatticeNode, LatticeNodeId, LatticeNodeKind } from '@lattice/types';
+import type { LatticeState, LatticeNode, LatticeNodeId, LatticeNodeKind, LatticeConnection, NodeSchema } from '@lattice/types';
 import type { Point } from '@mesh/types';
 import { parseAndTypeCheck } from '@lattice/expression';
 import { MeshCanvas, useMeshProjection } from '@mesh/index';
@@ -13,114 +13,49 @@ const ALL_KINDS: ReadonlyArray<LatticeNodeKind> = ['source', 'transform', 'sink'
 
 type ExecutionStatus = 'idle' | 'running' | 'blocked' | 'stopped';
 
-function createSampleLatticeState(): LatticeState {
-  const sourceId = createLatticeNodeId('node-source-001');
-  const transformId = createLatticeNodeId('node-transform-002');
-  const sinkId = createLatticeNodeId('node-sink-003');
-  const gateId = createLatticeNodeId('node-gate-004');
-
-  const nodes = new Map<LatticeNodeId, LatticeNode>([
-    [
-      sourceId,
-      {
-        id: sourceId,
-        kind: 'source',
-        schema: {
-          input: {
-            data: { name: 'data', type: 'string', required: true },
-          },
-          output: {
-            result: { name: 'result', type: 'string', required: true },
-          },
-        },
-      },
-    ],
-    [
-      transformId,
-      {
-        id: transformId,
-        kind: 'transform',
-        schema: {
-          input: {
-            input: { name: 'input', type: 'string', required: true },
-            factor: { name: 'factor', type: 'number', required: true },
-          },
-          output: {
-            output: { name: 'output', type: 'string', required: true },
-          },
-        },
-      },
-    ],
-    [
-      sinkId,
-      {
-        id: sinkId,
-        kind: 'sink',
-        schema: {
-          input: {
-            value: { name: 'value', type: 'string', required: true },
-          },
-          output: {
-            confirmed: { name: 'confirmed', type: 'boolean', required: true },
-          },
-        },
-      },
-    ],
-    [
-      gateId,
-      {
-        id: gateId,
-        kind: 'gate',
-        schema: {
-          input: {
-            payload: { name: 'payload', type: 'object', required: true },
-            active: { name: 'active', type: 'boolean', required: true },
-          },
-          output: {
-            items: { name: 'items', type: 'array', required: true },
-          },
-        },
-      },
-    ],
-  ]);
-
-  const connections = [
-    {
-      id: 'conn-001',
-      from: sourceId,
-      to: transformId,
-      fromPort: 'result',
-      toPort: 'input',
+const KIND_SCHEMAS: Record<LatticeNodeKind, NodeSchema> = {
+  source: {
+    input: {},
+    output: { emit: { name: 'emit', type: 'string', required: true } },
+  },
+  transform: {
+    input: { input: { name: 'input', type: 'string', required: true } },
+    output: { output: { name: 'output', type: 'string', required: true } },
+  },
+  sink: {
+    input: { receive: { name: 'receive', type: 'string', required: true } },
+    output: {},
+  },
+  gate: {
+    input: {
+      condition: { name: 'condition', type: 'boolean', required: true },
+      data: { name: 'data', type: 'string', required: true },
     },
-    {
-      id: 'conn-002',
-      from: transformId,
-      to: sinkId,
-      fromPort: 'output',
-      toPort: 'value',
+    output: { passed: { name: 'passed', type: 'string', required: true } },
+  },
+  merge: {
+    input: {
+      a: { name: 'a', type: 'string', required: true },
+      b: { name: 'b', type: 'string', required: true },
     },
-    {
-      id: 'conn-003',
-      from: transformId,
-      to: gateId,
-      fromPort: 'output',
-      toPort: 'payload',
+    output: { merged: { name: 'merged', type: 'string', required: true } },
+  },
+  split: {
+    input: { input: { name: 'input', type: 'string', required: true } },
+    output: {
+      left: { name: 'left', type: 'string', required: true },
+      right: { name: 'right', type: 'string', required: true },
     },
-  ];
+  },
+};
 
-  const values = new Map([
-    [sourceId, { data: 'hello-world', result: 'HELLO-WORLD' }],
-    [transformId, { input: 'HELLO-WORLD', factor: 2, output: 'transformed' }],
-    [sinkId, { value: 'transformed', confirmed: true }],
-    [gateId, { payload: { key: 'value' }, active: true, items: [1, 2, 3] }],
-  ]);
-
+function createEmptyLatticeState(): LatticeState {
   return {
-    nodes,
-    connections,
-    values,
+    nodes: new Map<LatticeNodeId, LatticeNode>(),
+    connections: [],
+    values: new Map(),
     status: 'idle',
-    version: 1,
+    version: 0,
   };
 }
 
@@ -176,10 +111,11 @@ const STATUS_BAR_LABELS: Record<ExecutionStatus, string> = {
 };
 
 export default function MeshPage({ onStateChange }: MeshPageProps): React.ReactElement {
-  const [state] = useState(() => createSampleLatticeState());
+  const [state, setState] = useState(() => createEmptyLatticeState());
   const [expressions, setExpressions] = useState<Map<string, string>>(new Map());
   const [nodeTypeStatus, setNodeTypeStatus] = useState<Map<string, 'unchecked' | 'valid' | 'invalid'>>(new Map());
   const [nodeTypeErrors, setNodeTypeErrors] = useState<Map<string, string>>(new Map());
+  const kindCounters = useRef<Map<LatticeNodeKind, number>>(new Map());
 
   const view = useMeshProjection(state, expressions, nodeTypeStatus, nodeTypeErrors);
 
@@ -196,9 +132,11 @@ export default function MeshPage({ onStateChange }: MeshPageProps): React.ReactE
   );
 
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
+  const [selectedEdgeId, setSelectedEdgeId] = useState<string | null>(null);
   const [editingNodeId, setEditingNodeId] = useState<string | null>(null);
   const [executionStatus, setExecutionStatus] = useState<ExecutionStatus>('idle');
   const [errorMessage, setErrorMessage] = useState<string>('');
+  const [showAddMenu, setShowAddMenu] = useState<boolean>(false);
 
   const typeCheckGuard = useTypeCheckGuard();
 
@@ -224,9 +162,73 @@ export default function MeshPage({ onStateChange }: MeshPageProps): React.ReactE
     [],
   );
 
+  const stateVersionRef = useRef(state.version);
   useEffect(() => {
+    if (state.version !== stateVersionRef.current) {
+      stateVersionRef.current = state.version;
+    }
     onStateChange?.(state, expressions, nodeTypeErrors);
   }, [state, expressions, nodeTypeErrors, onStateChange]);
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent): void => {
+      const tag = (e.target as HTMLElement)?.tagName;
+      if (tag === 'TEXTAREA' || tag === 'INPUT') return;
+
+      if (e.key === 'Delete' || e.key === 'Backspace') {
+        e.preventDefault();
+        if (selectedNodeId !== null) {
+          setNodePositions((prev) => {
+            const next = new Map(prev);
+            next.delete(selectedNodeId);
+            return next;
+          });
+          setExpressions((prev) => {
+            const next = new Map(prev);
+            next.delete(selectedNodeId);
+            return next;
+          });
+          setNodeTypeStatus((prev) => {
+            const next = new Map(prev);
+            next.delete(selectedNodeId);
+            return next;
+          });
+          setNodeTypeErrors((prev) => {
+            const next = new Map(prev);
+            next.delete(selectedNodeId);
+            return next;
+          });
+          setState((prev) => {
+            const nextNodes = new Map(prev.nodes);
+            nextNodes.delete(selectedNodeId as LatticeNodeId);
+            const nextConnections = prev.connections.filter(
+              (c) => c.from !== selectedNodeId && c.to !== selectedNodeId,
+            );
+            return { ...prev, nodes: nextNodes, connections: nextConnections, version: prev.version + 1 };
+          });
+          setSelectedNodeId(null);
+          setEditingNodeId(null);
+        } else if (selectedEdgeId !== null) {
+          setState((prev) => ({
+            ...prev,
+            connections: prev.connections.filter((c) => c.id !== selectedEdgeId),
+            version: prev.version + 1,
+          }));
+          setSelectedEdgeId(null);
+        }
+      }
+
+      if (e.key === 'Escape') {
+        setSelectedNodeId(null);
+        setSelectedEdgeId(null);
+        setEditingNodeId(null);
+        setShowAddMenu(false);
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [selectedNodeId, selectedEdgeId]);
 
   const handleNodeMove = useCallback(
     (nodeId: string, newPosition: Point): void => {
@@ -241,6 +243,9 @@ export default function MeshPage({ onStateChange }: MeshPageProps): React.ReactE
 
   const handleNodeSelect = useCallback((nodeId: string | null): void => {
     setSelectedNodeId(nodeId);
+    if (nodeId !== null) {
+      setSelectedEdgeId(null);
+    }
   }, []);
 
   const handleNodeDoubleClick = useCallback((nodeId: string): void => {
@@ -249,19 +254,18 @@ export default function MeshPage({ onStateChange }: MeshPageProps): React.ReactE
 
   const handleAddNode = useCallback(
     (kind: LatticeNodeKind): void => {
-      const id = createLatticeNodeId(`node-${kind}-${Date.now()}`);
+      const currentCount = kindCounters.current.get(kind) ?? 0;
+      const nextCount = currentCount + 1;
+      kindCounters.current.set(kind, nextCount);
+      const id = createLatticeNodeId(`${kind}-${nextCount}-${Date.now()}`);
       const newNode: LatticeNode = {
         id,
         kind,
-        schema: {
-          input: { data: { name: 'data', type: 'string', required: true } },
-          output: { result: { name: 'result', type: 'string', required: true } },
-        },
+        schema: KIND_SCHEMAS[kind],
       };
 
-      const lastPos = Array.from(nodePositions.values()).pop();
-      const x = (lastPos?.x ?? 80) + 250;
-      const y = lastPos?.y ?? 60;
+      const x = 200 + Math.random() * 100;
+      const y = 100 + Math.random() * 100;
 
       setNodePositions((prev) => {
         const next = new Map(prev);
@@ -269,10 +273,13 @@ export default function MeshPage({ onStateChange }: MeshPageProps): React.ReactE
         return next;
       });
 
-      void state;
-      void newNode;
+      setState((prev) => {
+        const nextNodes = new Map(prev.nodes);
+        nextNodes.set(id, newNode);
+        return { ...prev, nodes: nextNodes, version: prev.version + 1 };
+      });
     },
-    [nodePositions, state],
+    [],
   );
 
   const handleDeleteNode = useCallback((): void => {
@@ -297,9 +304,53 @@ export default function MeshPage({ onStateChange }: MeshPageProps): React.ReactE
       next.delete(selectedNodeId);
       return next;
     });
+    setState((prev) => {
+      const nextNodes = new Map(prev.nodes);
+      nextNodes.delete(selectedNodeId as LatticeNodeId);
+      const nextConnections = prev.connections.filter(
+        (c) => c.from !== selectedNodeId && c.to !== selectedNodeId,
+      );
+      return { ...prev, nodes: nextNodes, connections: nextConnections, version: prev.version + 1 };
+    });
     setSelectedNodeId(null);
     setEditingNodeId(null);
   }, [selectedNodeId]);
+
+  const handleConnectionCreate = useCallback(
+    (fromNodeId: string, fromPort: string, toNodeId: string, toPort: string): void => {
+      const connId = `conn-${Date.now()}`;
+      const newConn: LatticeConnection = {
+        id: connId,
+        from: createLatticeNodeId(fromNodeId),
+        to: createLatticeNodeId(toNodeId),
+        fromPort,
+        toPort,
+      };
+      setState((prev) => ({
+        ...prev,
+        connections: [...prev.connections, newConn],
+        version: prev.version + 1,
+      }));
+    },
+    [],
+  );
+
+  const handleEdgeSelect = useCallback((edgeId: string | null): void => {
+    setSelectedEdgeId(edgeId);
+    if (edgeId !== null) {
+      setSelectedNodeId(null);
+    }
+  }, []);
+
+  const handleDeleteConnection = useCallback((): void => {
+    if (selectedEdgeId === null) return;
+    setState((prev) => ({
+      ...prev,
+      connections: prev.connections.filter((c) => c.id !== selectedEdgeId),
+      version: prev.version + 1,
+    }));
+    setSelectedEdgeId(null);
+  }, [selectedEdgeId]);
 
   const handleExpressionCommit = useCallback(
     (nodeId: string, expression: string): void => {
@@ -410,18 +461,24 @@ export default function MeshPage({ onStateChange }: MeshPageProps): React.ReactE
         <span>MESH</span>
         <span style={{ color: '#555555' }}>|</span>
         <div style={{ position: 'relative' }}>
-          <span style={{ cursor: 'pointer', color: '#aaaaaa' }}>+ Add Node ▾</span>
-          <div style={{
-            position: 'absolute',
-            top: '100%',
-            left: 0,
-            display: 'none',
-            backgroundColor: '#14141f',
-            border: '1px solid #2a2a3e',
-            borderRadius: '4px',
-            padding: '4px 0',
-            zIndex: 100,
-          }}>
+          <span
+            style={{ cursor: 'pointer', color: '#aaaaaa' }}
+            onClick={() => setShowAddMenu(!showAddMenu)}
+          >+ Add Node ▾</span>
+          <div
+            onMouseLeave={() => setShowAddMenu(false)}
+            style={{
+              position: 'absolute',
+              top: '100%',
+              left: 0,
+              display: showAddMenu ? 'block' : 'none',
+              backgroundColor: '#14141f',
+              border: '1px solid #2a2a3e',
+              borderRadius: '4px',
+              padding: '4px 0',
+              zIndex: 100,
+            }}
+          >
             {ALL_KINDS.map((kind) => (
               <div
                 key={kind}
@@ -430,7 +487,10 @@ export default function MeshPage({ onStateChange }: MeshPageProps): React.ReactE
                   cursor: 'pointer',
                   color: '#cccccc',
                 }}
-                onClick={() => handleAddNode(kind)}
+                onClick={() => {
+                  handleAddNode(kind);
+                  setShowAddMenu(false);
+                }}
               >
                 {kind}
               </div>
@@ -443,6 +503,14 @@ export default function MeshPage({ onStateChange }: MeshPageProps): React.ReactE
             onClick={handleDeleteNode}
           >
             ✕ Delete
+          </span>
+        )}
+        {selectedEdgeId !== null && (
+          <span
+            style={{ cursor: 'pointer', color: '#f59e0b' }}
+            onClick={handleDeleteConnection}
+          >
+            ✕ Delete Wire
           </span>
         )}
         <span style={{ color: '#555555' }}>|</span>
@@ -476,7 +544,7 @@ export default function MeshPage({ onStateChange }: MeshPageProps): React.ReactE
           </span>
         )}
         <span style={{ marginLeft: 'auto', color: '#555555' }}>
-          {view.nodes.length} nodes · {view.edges.length} edges
+          {view.nodes.length} nodes · {view.edges.length} edges · {state.connections.length} connections
         </span>
       </div>
       {errorMessage.length > 0 && (
@@ -506,6 +574,7 @@ export default function MeshPage({ onStateChange }: MeshPageProps): React.ReactE
         <MeshCanvas
           view={view}
           selectedNodeId={selectedNodeId}
+          selectedEdgeId={selectedEdgeId}
           editingNodeId={editingNodeId}
           nodePositions={nodePositions}
           isBlocking={typeCheckGuard.isBlocking}
@@ -514,6 +583,14 @@ export default function MeshPage({ onStateChange }: MeshPageProps): React.ReactE
           onNodeDoubleClick={handleNodeDoubleClick}
           onExpressionCommit={handleExpressionCommit}
           onExpressionCancel={handleExpressionCancel}
+          onConnectionCreate={handleConnectionCreate}
+          onEdgeSelect={handleEdgeSelect}
+          existingConnections={state.connections.map((c) => ({
+            from: c.from as string,
+            to: c.to as string,
+            fromPort: c.fromPort,
+            toPort: c.toPort,
+          }))}
         />
       </div>
       <div style={{

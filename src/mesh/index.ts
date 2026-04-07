@@ -9,6 +9,8 @@ export type {
   MeshProjectionFn,
   TypeStatus,
   CanvasState,
+  PortInfo,
+  ConnectionDragState,
 } from './types';
 
 export {
@@ -38,6 +40,7 @@ export { projectMesh } from './projector';
 export { useMeshProjection } from './hooks/useMeshProjection';
 export { useInfiniteCanvas } from './hooks/useInfiniteCanvas';
 export { useNodeDrag } from './hooks/useNodeDrag';
+export { useConnectionDrag } from './hooks/useConnectionDrag';
 export { useExpressionTypeCheck } from './hooks/useExpressionTypeCheck';
 export type { TypeCheckResult } from './hooks/useExpressionTypeCheck';
 export { useTypeCheckGuard } from './hooks/useTypeCheckGuard';
