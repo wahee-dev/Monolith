@@ -27,3 +27,35 @@ export {
   getNodesByCategory,
   searchNodes,
 } from './registry';
+
+export type {
+  Point as HistoryPoint,
+  HistoryEntry,
+  HistoryState,
+} from './history';
+
+export {
+  createHistory,
+  pushHistory,
+  undo,
+  redo,
+  canUndo,
+  canRedo,
+  getHistoryLabel,
+} from './history';
+
+export type {
+  ExecutionMode,
+  ExecutionStepStatus,
+  ExecutionStep,
+  ExecutionState,
+} from './execution';
+
+export {
+  createExecutionState,
+  startExecution,
+  stepExecution,
+  pauseExecution,
+  resetExecution,
+  isExecutionComplete,
+} from './execution';

@@ -46,6 +46,9 @@ export type { TypeCheckResult } from './hooks/useExpressionTypeCheck';
 export { useTypeCheckGuard } from './hooks/useTypeCheckGuard';
 export type { TypeCheckRunResult } from './hooks/useTypeCheckGuard';
 
+export { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts';
+export type { KeyboardActions } from './hooks/useKeyboardShortcuts';
+
 export { MeshCanvas } from './components/MeshCanvas';
 export { NodeView as NodeViewComponent } from './components/NodeView';
 export { EdgeView as EdgeViewComponent } from './components/EdgeView';
