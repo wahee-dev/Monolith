@@ -40,6 +40,8 @@ export { useInfiniteCanvas } from './hooks/useInfiniteCanvas';
 export { useNodeDrag } from './hooks/useNodeDrag';
 export { useExpressionTypeCheck } from './hooks/useExpressionTypeCheck';
 export type { TypeCheckResult } from './hooks/useExpressionTypeCheck';
+export { useTypeCheckGuard } from './hooks/useTypeCheckGuard';
+export type { TypeCheckRunResult } from './hooks/useTypeCheckGuard';
 
 export { MeshCanvas } from './components/MeshCanvas';
 export { NodeView as NodeViewComponent } from './components/NodeView';

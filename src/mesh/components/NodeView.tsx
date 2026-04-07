@@ -8,6 +8,7 @@ interface NodeViewProps {
   readonly isSelected: boolean;
   readonly isEditing: boolean;
   readonly isDragging: boolean;
+  readonly isBlocking: boolean;
   readonly onMouseDown: (e: React.MouseEvent<SVGGElement>) => void;
   readonly onDoubleClick: () => void;
 }
@@ -25,6 +26,7 @@ export function NodeView({
   isSelected,
   isEditing,
   isDragging,
+  isBlocking,
   onMouseDown,
   onDoubleClick,
 }: NodeViewProps): React.ReactElement {
@@ -84,6 +86,33 @@ export function NodeView({
             </feMerge>
           </filter>
         </defs>
+      )}
+      {typeStatus === 'invalid' && isBlocking && (
+        <rect
+          x={rect.x - 4}
+          y={rect.y - 4}
+          width={rect.width + 8}
+          height={rect.height + 8}
+          rx="10"
+          ry="10"
+          fill="none"
+          stroke="#ef4444"
+          strokeWidth="2"
+          strokeOpacity="0.6"
+        >
+          <animate
+            attributeName="strokeOpacity"
+            values="0.6;0.1;0.6"
+            dur="1.5s"
+            repeatCount="indefinite"
+          />
+          <animate
+            attributeName="strokeWidth"
+            values="2;4;2"
+            dur="1.5s"
+            repeatCount="indefinite"
+          />
+        </rect>
       )}
       <rect
         x={rect.x}

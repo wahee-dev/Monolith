@@ -14,6 +14,7 @@ interface MeshCanvasProps {
   readonly selectedNodeId: string | null;
   readonly editingNodeId: string | null;
   readonly nodePositions: ReadonlyMap<string, Point>;
+  readonly isBlocking: boolean;
   readonly onNodeMove: (nodeId: string, newPosition: Point) => void;
   readonly onNodeSelect: (nodeId: string | null) => void;
   readonly onNodeDoubleClick: (nodeId: string) => void;
@@ -60,6 +61,7 @@ export function MeshCanvas({
   selectedNodeId,
   editingNodeId,
   nodePositions,
+  isBlocking,
   onNodeMove,
   onNodeSelect,
   onNodeDoubleClick,
@@ -173,6 +175,7 @@ export function MeshCanvas({
           isSelected={node.id === selectedNodeId}
           isEditing={node.id === editingNodeId}
           isDragging={node.id === drag.draggingNodeId}
+          isBlocking={isBlocking}
           onMouseDown={(e: React.MouseEvent<SVGGElement>) => handleNodeMouseDown(node.id, e)}
           onDoubleClick={() => onNodeDoubleClick(node.id)}
         />
