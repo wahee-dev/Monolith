@@ -1,0 +1,467 @@
+'use client';
+
+import { useState, useCallback } from 'react';
+import type { NodeSchema } from '@lattice/types';
+import type { NodeCategory } from '@engine/types';
+import { PortView } from './PortView';
+import { SchemaEditor } from './SchemaEditor';
+import type { InspectorState } from './types';
+
+interface InspectorPanelProps {
+  readonly inspectorState: InspectorState;
+  readonly onExpressionChange: (expression: string) => void;
+  readonly onExpressionCommit: (expression: string) => void;
+  readonly onSchemaChange: (schema: NodeSchema) => void;
+  readonly onClose: () => void;
+}
+
+const CATEGORY_COLORS: Record<NodeCategory, string> = {
+  data: '#4a9eff',
+  logic: '#ff9f4a',
+  transform: '#9f4aff',
+  io: '#4aff9f',
+  ui: '#ff4a9f',
+  flow: '#9fff4a',
+};
+
+function formatOutput(output: unknown): string {
+  try {
+    return JSON.stringify(output, null, 2);
+  } catch {
+    return String(output);
+  }
+}
+
+export function InspectorPanel({
+  inspectorState,
+  onExpressionChange,
+  onExpressionCommit,
+  onSchemaChange,
+  onClose,
+}: InspectorPanelProps): React.ReactElement {
+  const [outputExpanded, setOutputExpanded] = useState<boolean>(false);
+  const [expressionText, setExpressionText] = useState<string>(inspectorState.expression);
+  const [expressionValid, setExpressionValid] = useState<boolean>(true);
+
+  const { nodeDefinition, executionOutput, executionError, lastExecutionTime, portValues, validationErrors } =
+    inspectorState;
+
+  const handleExpressionChange = useCallback(
+    (e: React.ChangeEvent<HTMLTextAreaElement>): void => {
+      const value = e.target.value;
+      setExpressionText(value);
+      onExpressionChange(value);
+      setExpressionValid(value.trim().length === 0 || value.length > 0);
+    },
+    [onExpressionChange],
+  );
+
+  const handleExpressionKeyDown = useCallback(
+    (e: React.KeyboardEvent<HTMLTextAreaElement>): void => {
+      if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
+        e.preventDefault();
+        onExpressionCommit(expressionText);
+      }
+    },
+    [expressionText, onExpressionCommit],
+  );
+
+  const hasDefinition = nodeDefinition !== null;
+
+  return (
+    <div
+      style={{
+        width: '280px',
+        height: '100%',
+        backgroundColor: '#0c0c14',
+        borderLeft: '1px solid #2a2a3e',
+        display: 'flex',
+        flexDirection: 'column',
+        fontFamily: 'monospace',
+        overflow: 'hidden',
+        flexShrink: 0,
+      }}
+    >
+      {hasDefinition ? (
+        <>
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              padding: '12px',
+              borderBottom: '1px solid #2a2a3e',
+              backgroundColor: '#14141f',
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <span
+                style={{
+                  color: '#e0e0e0',
+                  fontSize: '14px',
+                  fontWeight: 'bold',
+                  fontFamily: 'monospace',
+                }}
+              >
+                {nodeDefinition.label}
+              </span>
+              <span
+                style={{
+                  color: CATEGORY_COLORS[nodeDefinition.category],
+                  backgroundColor: `${CATEGORY_COLORS[nodeDefinition.category]}22`,
+                  padding: '2px 8px',
+                  borderRadius: '10px',
+                  fontSize: '10px',
+                  fontFamily: 'monospace',
+                  textTransform: 'uppercase',
+                }}
+              >
+                {nodeDefinition.category}
+              </span>
+            </div>
+            <button
+              type="button"
+              onClick={onClose}
+              style={{
+                backgroundColor: 'transparent',
+                color: '#888888',
+                border: 'none',
+                cursor: 'pointer',
+                fontSize: '16px',
+                padding: '0 4px',
+                fontFamily: 'monospace',
+                lineHeight: 1,
+              }}
+            >
+              x
+            </button>
+          </div>
+
+          <div
+            style={{
+              flex: 1,
+              overflowY: 'auto',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '0',
+            }}
+          >
+            <div style={{ padding: '12px', borderBottom: '1px solid #2a2a3e' }}>
+              <span
+                style={{
+                  color: '#888888',
+                  fontSize: '11px',
+                  fontFamily: 'monospace',
+                  fontWeight: 'bold',
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.5px',
+                }}
+              >
+                Description
+              </span>
+              <p
+                style={{
+                  color: '#e0e0e0',
+                  fontSize: '11px',
+                  fontFamily: 'monospace',
+                  margin: '4px 0 0 0',
+                  lineHeight: 1.4,
+                }}
+              >
+                {nodeDefinition.description}
+              </p>
+            </div>
+
+            {(nodeDefinition.inputs.length > 0 || nodeDefinition.outputs.length > 0) && (
+              <div style={{ padding: '12px', borderBottom: '1px solid #2a2a3e' }}>
+                <span
+                  style={{
+                    color: '#888888',
+                    fontSize: '11px',
+                    fontFamily: 'monospace',
+                    fontWeight: 'bold',
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.5px',
+                  }}
+                >
+                  Ports
+                </span>
+                <div style={{ marginTop: '8px' }}>
+                  {nodeDefinition.inputs.length > 0 && (
+                    <div style={{ marginBottom: '8px' }}>
+                      <span
+                        style={{
+                          color: '#4a9eff',
+                          fontSize: '10px',
+                          fontFamily: 'monospace',
+                          textTransform: 'uppercase',
+                        }}
+                      >
+                        Inputs
+                      </span>
+                      {nodeDefinition.inputs.map((port) => (
+                        <PortView
+                          key={port.name}
+                          name={port.name}
+                          type={port.type}
+                          value={portValues.get(port.name)}
+                          isConnected={portValues.has(port.name)}
+                        />
+                      ))}
+                    </div>
+                  )}
+                  {nodeDefinition.outputs.length > 0 && (
+                    <div>
+                      <span
+                        style={{
+                          color: '#22c55e',
+                          fontSize: '10px',
+                          fontFamily: 'monospace',
+                          textTransform: 'uppercase',
+                        }}
+                      >
+                        Outputs
+                      </span>
+                      {nodeDefinition.outputs.map((port) => (
+                        <PortView
+                          key={port.name}
+                          name={port.name}
+                          type={port.type}
+                          value={portValues.get(port.name)}
+                          isConnected={portValues.has(port.name)}
+                        />
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            <div style={{ padding: '12px', borderBottom: '1px solid #2a2a3e' }}>
+              <span
+                style={{
+                  color: '#888888',
+                  fontSize: '11px',
+                  fontFamily: 'monospace',
+                  fontWeight: 'bold',
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.5px',
+                  display: 'block',
+                  marginBottom: '6px',
+                }}
+              >
+                Expression
+              </span>
+              <textarea
+                value={expressionText}
+                onChange={handleExpressionChange}
+                onKeyDown={handleExpressionKeyDown}
+                placeholder="Enter expression..."
+                style={{
+                  width: '100%',
+                  minHeight: '150px',
+                  backgroundColor: '#1a1a2e',
+                  color: '#e0e0e0',
+                  border: `1px solid ${expressionValid ? '#2a2a3e' : '#ef4444'}`,
+                  borderRadius: '4px',
+                  padding: '8px',
+                  fontFamily: 'monospace',
+                  fontSize: '12px',
+                  resize: 'vertical',
+                  outline: 'none',
+                  boxSizing: 'border-box',
+                }}
+              />
+              <div
+                style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  marginTop: '4px',
+                }}
+              >
+                <span
+                  style={{
+                    color: expressionValid ? '#22c55e' : '#ef4444',
+                    fontSize: '10px',
+                    fontFamily: 'monospace',
+                  }}
+                >
+                  {expressionValid ? 'Ctrl+Enter to commit' : 'Invalid expression'}
+                </span>
+              </div>
+            </div>
+
+            {nodeDefinition.editableSchema && (
+              <div style={{ padding: '12px', borderBottom: '1px solid #2a2a3e' }}>
+                <SchemaEditor
+                  schema={{
+                    input: Object.fromEntries(
+                      nodeDefinition.inputs.map((p) => [
+                        p.name,
+                        { name: p.name, type: p.type as 'string' | 'number' | 'boolean' | 'object' | 'array', required: true as const },
+                      ]),
+                    ),
+                    output: Object.fromEntries(
+                      nodeDefinition.outputs.map((p) => [
+                        p.name,
+                        { name: p.name, type: p.type as 'string' | 'number' | 'boolean' | 'object' | 'array', required: true as const },
+                      ]),
+                    ),
+                  }}
+                  onSchemaChange={onSchemaChange}
+                />
+              </div>
+            )}
+
+            <div style={{ padding: '12px', borderBottom: '1px solid #2a2a3e' }}>
+              <div
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  cursor: 'pointer',
+                }}
+                onClick={(): void => setOutputExpanded(!outputExpanded)}
+                onKeyDown={(e): void => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    setOutputExpanded(!outputExpanded);
+                  }
+                }}
+                role="button"
+                tabIndex={0}
+              >
+                <span
+                  style={{
+                    color: '#888888',
+                    fontSize: '11px',
+                    fontFamily: 'monospace',
+                    fontWeight: 'bold',
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.5px',
+                  }}
+                >
+                  Output
+                </span>
+                <span
+                  style={{
+                    color: '#888888',
+                    fontSize: '10px',
+                    fontFamily: 'monospace',
+                  }}
+                >
+                  {outputExpanded ? '\u25BC' : '\u25B6'}
+                </span>
+              </div>
+              {lastExecutionTime > 0 && (
+                <span
+                  style={{
+                    color: '#888888',
+                    fontSize: '10px',
+                    fontFamily: 'monospace',
+                    display: 'block',
+                    marginTop: '2px',
+                  }}
+                >
+                  {lastExecutionTime}ms
+                </span>
+              )}
+              {executionError.length > 0 && (
+                <div
+                  style={{
+                    color: '#ef4444',
+                    fontSize: '11px',
+                    fontFamily: 'monospace',
+                    marginTop: '4px',
+                    padding: '6px',
+                    backgroundColor: '#1a0a0a',
+                    borderRadius: '3px',
+                    border: '1px solid #ef4444',
+                  }}
+                >
+                  {executionError}
+                </div>
+              )}
+              {outputExpanded && executionOutput !== undefined && (
+                <pre
+                  style={{
+                    color: '#e0e0e0',
+                    fontSize: '11px',
+                    fontFamily: 'monospace',
+                    margin: '8px 0 0 0',
+                    padding: '8px',
+                    backgroundColor: '#14141f',
+                    borderRadius: '3px',
+                    border: '1px solid #2a2a3e',
+                    maxHeight: '200px',
+                    overflow: 'auto',
+                    whiteSpace: 'pre-wrap',
+                    wordBreak: 'break-all',
+                  }}
+                >
+                  {formatOutput(executionOutput)}
+                </pre>
+              )}
+            </div>
+
+            {validationErrors.length > 0 && (
+              <div style={{ padding: '12px' }}>
+                <span
+                  style={{
+                    color: '#ef4444',
+                    fontSize: '11px',
+                    fontFamily: 'monospace',
+                    fontWeight: 'bold',
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.5px',
+                    display: 'block',
+                    marginBottom: '6px',
+                  }}
+                >
+                  Errors ({validationErrors.length})
+                </span>
+                {validationErrors.map((error, index) => (
+                  <div
+                    key={`error-${index}`}
+                    style={{
+                      color: '#ef4444',
+                      fontSize: '11px',
+                      fontFamily: 'monospace',
+                      padding: '4px 6px',
+                      backgroundColor: '#1a0a0a',
+                      borderRadius: '3px',
+                      border: '1px solid #2a2a3e',
+                      marginBottom: '4px',
+                    }}
+                  >
+                    {error}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </>
+      ) : (
+        <div
+          style={{
+            flex: 1,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: '20px',
+          }}
+        >
+          <span
+            style={{
+              color: '#888888',
+              fontSize: '12px',
+              fontFamily: 'monospace',
+              textAlign: 'center',
+            }}
+          >
+            Select a node to inspect
+          </span>
+        </div>
+      )}
+    </div>
+  );
+}

@@ -39,6 +39,9 @@
       ],
       "@engine/*": [
         "engine/*"
+      ],
+      "@inspector/*": [
+        "inspector/*"
       ]
     },
     "plugins": [
