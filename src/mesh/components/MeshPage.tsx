@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { createLatticeNodeId } from '@lattice/types';
 import type { LatticeState, LatticeNode, LatticeNodeId, LatticeNodeKind } from '@lattice/types';
 import type { Point } from '@mesh/types';
@@ -148,7 +148,15 @@ function extractInitialPositions(state: LatticeState): Map<string, Point> {
   return positions;
 }
 
-export default function MeshPage(): React.ReactElement {
+export interface MeshPageProps {
+  readonly onStateChange?: (
+    state: LatticeState,
+    expressions: ReadonlyMap<string, string>,
+    typeErrors: ReadonlyMap<string, string>,
+  ) => void;
+}
+
+export default function MeshPage({ onStateChange }: MeshPageProps): React.ReactElement {
   const [state] = useState(() => createSampleLatticeState());
   const view = useMeshProjection(state);
 
@@ -179,6 +187,10 @@ export default function MeshPage(): React.ReactElement {
     }));
     return { ...view, nodes };
   }, [view, expressions, nodeTypeStatus, nodeTypeErrors]);
+
+  useEffect(() => {
+    onStateChange?.(state, expressions, nodeTypeErrors);
+  }, [state, expressions, nodeTypeErrors, onStateChange]);
 
   const handleNodeMove = useCallback(
     (nodeId: string, newPosition: Point): void => {

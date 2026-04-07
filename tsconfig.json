@@ -33,6 +33,9 @@
       ],
       "@mesh/*": [
         "mesh/*"
+      ],
+      "@preview/*": [
+        "preview/*"
       ]
     },
     "plugins": [
