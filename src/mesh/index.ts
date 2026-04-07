@@ -7,6 +7,8 @@ export type {
   EdgeView,
   MeshView,
   MeshProjectionFn,
+  TypeStatus,
+  CanvasState,
 } from './types';
 
 export {
@@ -34,6 +36,8 @@ export { renderArrayField } from './renderers/array';
 export { projectMesh } from './projector';
 
 export { useMeshProjection } from './hooks/useMeshProjection';
+export { useInfiniteCanvas } from './hooks/useInfiniteCanvas';
+export { useNodeDrag } from './hooks/useNodeDrag';
 
 export { MeshCanvas } from './components/MeshCanvas';
 export { NodeView as NodeViewComponent } from './components/NodeView';

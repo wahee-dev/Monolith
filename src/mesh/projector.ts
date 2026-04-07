@@ -104,6 +104,9 @@ function buildNodeViews(
       label: `${node.kind}::${(nodeId as string).slice(0, 8)}`,
       fields,
       color,
+      expression: '',
+      typeStatus: 'unchecked' as const,
+      typeError: '',
     });
   }
 
@@ -135,6 +138,8 @@ function buildEdgeViews(
     const curve = computeBezierPath(fromView.rect, toView.rect);
     edges.push({
       id: conn.id,
+      fromNodeId: conn.from as string,
+      toNodeId: conn.to as string,
       curve,
       label: `${conn.fromPort} → ${conn.toPort}`,
       color: '#666666',

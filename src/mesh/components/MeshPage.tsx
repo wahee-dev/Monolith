@@ -1,13 +1,12 @@
 'use client';
 
-import { useMemo } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { createLatticeNodeId } from '@lattice/types';
-import type { LatticeState, LatticeNode, LatticeNodeId } from '@lattice/types';
+import type { LatticeState, LatticeNode, LatticeNodeId, LatticeNodeKind } from '@lattice/types';
+import type { Point } from '@mesh/types';
 import { MeshCanvas, useMeshProjection } from '@mesh/index';
 
-function makeNode(node: LatticeNode): LatticeNode {
-  return node;
-}
+const ALL_KINDS: ReadonlyArray<LatticeNodeKind> = ['source', 'transform', 'sink', 'gate', 'merge', 'split'];
 
 function createSampleLatticeState(): LatticeState {
   const sourceId = createLatticeNodeId('node-source-001');
@@ -18,7 +17,7 @@ function createSampleLatticeState(): LatticeState {
   const nodes = new Map<LatticeNodeId, LatticeNode>([
     [
       sourceId,
-      makeNode({
+      {
         id: sourceId,
         kind: 'source',
         schema: {
@@ -29,11 +28,11 @@ function createSampleLatticeState(): LatticeState {
             result: { name: 'result', type: 'string', required: true },
           },
         },
-      }),
+      },
     ],
     [
       transformId,
-      makeNode({
+      {
         id: transformId,
         kind: 'transform',
         schema: {
@@ -45,11 +44,11 @@ function createSampleLatticeState(): LatticeState {
             output: { name: 'output', type: 'string', required: true },
           },
         },
-      }),
+      },
     ],
     [
       sinkId,
-      makeNode({
+      {
         id: sinkId,
         kind: 'sink',
         schema: {
@@ -60,11 +59,11 @@ function createSampleLatticeState(): LatticeState {
             confirmed: { name: 'confirmed', type: 'boolean', required: true },
           },
         },
-      }),
+      },
     ],
     [
       gateId,
-      makeNode({
+      {
         id: gateId,
         kind: 'gate',
         schema: {
@@ -76,7 +75,7 @@ function createSampleLatticeState(): LatticeState {
             items: { name: 'items', type: 'array', required: true },
           },
         },
-      }),
+      },
     ],
   ]);
 
@@ -120,9 +119,217 @@ function createSampleLatticeState(): LatticeState {
   };
 }
 
+function extractInitialPositions(state: LatticeState): Map<string, Point> {
+  const positions = new Map<string, Point>();
+  const nodeList = Array.from(state.nodes.values());
+  let xOffset = 80;
+  let yOffset = 60;
+  const yOffsetStart = 60;
+  const layerGapX = 300;
+  const maxColumnHeight = 500;
+
+  for (let i = 0; i < nodeList.length; i++) {
+    const node = nodeList[i]!;
+    const inputCount = Object.keys(node.schema.input).length;
+    const outputCount = Object.keys(node.schema.output).length;
+    const height = 60 + (inputCount + outputCount) * 24;
+
+    positions.set(node.id as string, { x: xOffset, y: yOffset });
+    yOffset += height + 40;
+
+    if (yOffset > maxColumnHeight) {
+      yOffset = yOffsetStart;
+      xOffset += layerGapX;
+      yOffset = 60;
+      xOffset += layerGapX;
+    }
+  }
+
+  return positions;
+}
+
 export default function MeshPage(): React.ReactElement {
-  const state = useMemo(() => createSampleLatticeState(), []);
+  const [state] = useState(() => createSampleLatticeState());
   const view = useMeshProjection(state);
 
-  return <MeshCanvas view={view} />;
+  const [nodePositions, setNodePositions] = useState<Map<string, Point>>(
+    () => {
+      const positions = extractInitialPositions(state);
+      for (const node of view.nodes) {
+        if (!positions.has(node.id)) {
+          positions.set(node.id, { x: node.rect.x, y: node.rect.y });
+        }
+      }
+      return positions;
+    },
+  );
+
+  const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
+  const [editingNodeId, setEditingNodeId] = useState<string | null>(null);
+  const [expressions, setExpressions] = useState<Map<string, string>>(new Map());
+  const [nodeTypeStatus, setNodeTypeStatus] = useState<Map<string, 'unchecked' | 'valid' | 'invalid'>>(new Map());
+  const [nodeTypeErrors, setNodeTypeErrors] = useState<Map<string, string>>(new Map());
+
+  const enhancedView = useMemo(() => {
+    const nodes = view.nodes.map((node) => ({
+      ...node,
+      expression: expressions.get(node.id) ?? '',
+      typeStatus: nodeTypeStatus.get(node.id) ?? 'unchecked' as const,
+      typeError: nodeTypeErrors.get(node.id) ?? '',
+    }));
+    return { ...view, nodes };
+  }, [view, expressions, nodeTypeStatus, nodeTypeErrors]);
+
+  const handleNodeMove = useCallback(
+    (nodeId: string, newPosition: Point): void => {
+      setNodePositions((prev) => {
+        const next = new Map(prev);
+        next.set(nodeId, newPosition);
+        return next;
+      });
+    },
+    [],
+  );
+
+  const handleNodeSelect = useCallback((nodeId: string | null): void => {
+    setSelectedNodeId(nodeId);
+  }, []);
+
+  const handleNodeDoubleClick = useCallback((nodeId: string): void => {
+    setEditingNodeId(nodeId);
+  }, []);
+
+  const handleAddNode = useCallback(
+    (kind: LatticeNodeKind): void => {
+      const id = createLatticeNodeId(`node-${kind}-${Date.now()}`);
+      const newNode: LatticeNode = {
+        id,
+        kind,
+        schema: {
+          input: { data: { name: 'data', type: 'string', required: true } },
+          output: { result: { name: 'result', type: 'string', required: true } },
+        },
+      };
+
+      const lastPos = Array.from(nodePositions.values()).pop();
+      const x = (lastPos?.x ?? 80) + 250;
+      const y = lastPos?.y ?? 60;
+
+      setNodePositions((prev) => {
+        const next = new Map(prev);
+        next.set(id as string, { x, y });
+        return next;
+      });
+
+      void state;
+      void newNode;
+    },
+    [nodePositions, state],
+  );
+
+  const handleDeleteNode = useCallback((): void => {
+    if (selectedNodeId === null) return;
+    setNodePositions((prev) => {
+      const next = new Map(prev);
+      next.delete(selectedNodeId);
+      return next;
+    });
+    setExpressions((prev) => {
+      const next = new Map(prev);
+      next.delete(selectedNodeId);
+      return next;
+    });
+    setNodeTypeStatus((prev) => {
+      const next = new Map(prev);
+      next.delete(selectedNodeId);
+      return next;
+    });
+    setNodeTypeErrors((prev) => {
+      const next = new Map(prev);
+      next.delete(selectedNodeId);
+      return next;
+    });
+    setSelectedNodeId(null);
+    setEditingNodeId(null);
+  }, [selectedNodeId]);
+
+  return (
+    <div style={{
+      width: '100vw',
+      height: '100vh',
+      display: 'flex',
+      flexDirection: 'column',
+      backgroundColor: '#08080f',
+      overflow: 'hidden',
+    }}>
+      <div style={{
+        display: 'flex',
+        alignItems: 'center',
+        gap: '12px',
+        padding: '8px 16px',
+        backgroundColor: '#0c0c14',
+        borderBottom: '1px solid #1a1a2e',
+        fontFamily: 'monospace',
+        fontSize: '12px',
+        color: '#888888',
+        zIndex: 10,
+        flexShrink: 0,
+      }}>
+        <span style={{ color: '#4a9eff', fontWeight: 'bold' }}>MONOLITH</span>
+        <span style={{ color: '#555555' }}>|</span>
+        <span>MESH</span>
+        <span style={{ color: '#555555' }}>|</span>
+        <div style={{ position: 'relative' }}>
+          <span style={{ cursor: 'pointer', color: '#aaaaaa' }}>+ Add Node ▾</span>
+          <div style={{
+            position: 'absolute',
+            top: '100%',
+            left: 0,
+            display: 'none',
+            backgroundColor: '#14141f',
+            border: '1px solid #2a2a3e',
+            borderRadius: '4px',
+            padding: '4px 0',
+            zIndex: 100,
+          }}>
+            {ALL_KINDS.map((kind) => (
+              <div
+                key={kind}
+                style={{
+                  padding: '4px 12px',
+                  cursor: 'pointer',
+                  color: '#cccccc',
+                }}
+                onClick={() => handleAddNode(kind)}
+              >
+                {kind}
+              </div>
+            ))}
+          </div>
+        </div>
+        {selectedNodeId !== null && (
+          <span
+            style={{ cursor: 'pointer', color: '#ef4444' }}
+            onClick={handleDeleteNode}
+          >
+            ✕ Delete
+          </span>
+        )}
+        <span style={{ marginLeft: 'auto', color: '#555555' }}>
+          {enhancedView.nodes.length} nodes · {enhancedView.edges.length} edges
+        </span>
+      </div>
+      <div style={{ flex: 1, position: 'relative' }}>
+        <MeshCanvas
+          view={enhancedView}
+          selectedNodeId={selectedNodeId}
+          editingNodeId={editingNodeId}
+          nodePositions={nodePositions}
+          onNodeMove={handleNodeMove}
+          onNodeSelect={handleNodeSelect}
+          onNodeDoubleClick={handleNodeDoubleClick}
+        />
+      </div>
+    </div>
+  );
 }
