@@ -17,3 +17,6 @@ export { CAPABILITY_REGISTRY, checkCapability } from './capability';
 export type { CapabilityDefinition } from './capability';
 
 export { guard } from './guard';
+
+export { typecheckExpression, typecheckAllExpressions, guardTypeCheck } from './typecheck';
+export type { TypeCheckDiagnostic, AllNodesTypeCheckResult } from './typecheck';
