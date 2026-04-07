@@ -10,7 +10,13 @@ export type {
   TypeStatus,
   CanvasState,
   PortInfo,
+  PortView,
   ConnectionDragState,
+} from './types';
+
+export {
+  PORT_TYPE_COLORS,
+  getPortTypeColor,
 } from './types';
 
 export {

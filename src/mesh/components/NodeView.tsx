@@ -1,6 +1,8 @@
 'use client';
 
 import type { NodeView as NodeViewType } from '../types';
+import { getPortTypeColor } from '../types';
+import type { PortType } from '@engine/types';
 import { FieldViewComponent } from './FieldView';
 
 interface NodeViewProps {
@@ -9,6 +11,9 @@ interface NodeViewProps {
   readonly isEditing: boolean;
   readonly isDragging: boolean;
   readonly isBlocking: boolean;
+  readonly compatiblePortKeys: ReadonlySet<string> | null;
+  readonly draggingPortType: PortType | null;
+  readonly draggingPortDirection: 'input' | 'output' | null;
   readonly onMouseDown: (e: React.MouseEvent<SVGGElement>) => void;
   readonly onDoubleClick: () => void;
   readonly onPortMouseDown?: (portName: string, portType: 'input' | 'output', e: React.MouseEvent) => void;
@@ -21,9 +26,7 @@ const STATUS_BORDER_COLORS: Record<string, string> = {
   invalid: '#ef4444',
 };
 
-const PORT_RADIUS = 5;
-const PORT_SPACING = 22;
-const HEADER_HEIGHT = 28;
+const PORT_RADIUS = 6;
 
 export function NodeView({
   node,
@@ -31,6 +34,9 @@ export function NodeView({
   isEditing,
   isDragging,
   isBlocking,
+  compatiblePortKeys,
+  draggingPortType,
+  draggingPortDirection,
   onMouseDown,
   onDoubleClick,
   onPortMouseDown,
@@ -40,8 +46,6 @@ export function NodeView({
 
   const inputPorts = ports.filter((p) => p.direction === 'input');
   const outputPorts = ports.filter((p) => p.direction === 'output');
-  const headerHeight = HEADER_HEIGHT;
-  const fieldAreaHeight = rect.height - headerHeight;
 
   const selectionFilter = isSelected
     ? 'url(#selection-glow)'
@@ -52,6 +56,11 @@ export function NodeView({
   const expressionLines = expression.length > 0
     ? expression.split('\n')
     : [];
+
+  const isDragActive = draggingPortType !== null && draggingPortDirection !== null;
+  const targetDirection = isDragActive
+    ? (draggingPortDirection === 'output' ? 'input' : 'output')
+    : null;
 
   return (
     <g
@@ -228,16 +237,18 @@ export function NodeView({
           {typeError.length > 30 ? `${typeError.slice(0, 30)}…` : typeError}
         </text>
       )}
-      {inputPorts.map((port, idx) => {
-        const cy = rect.y + headerHeight + fieldAreaHeight / 2 + (idx - (inputPorts.length - 1) / 2) * PORT_SPACING;
+      {inputPorts.map((port) => {
+        const portColor = getPortTypeColor(port.type);
+        const portKey = `${node.id}:${port.name}:input`;
+        const isCompatible = isDragActive && targetDirection === 'input' && compatiblePortKeys?.has(portKey) === true;
         return (
           <circle
             key={`in-${port.name}`}
-            cx={rect.x}
-            cy={cy}
+            cx={port.position.x}
+            cy={port.position.y}
             r={PORT_RADIUS}
-            fill={isSelected || isDragging ? '#4a9eff' : '#08080f'}
-            stroke="#4a9eff"
+            fill={port.type === 'void' ? '#08080f' : (isSelected || isDragging || port.isConnected ? portColor : '#08080f')}
+            stroke={portColor}
             strokeWidth="1.5"
             style={{ cursor: 'crosshair' }}
             onMouseDown={(e: React.MouseEvent) => {
@@ -246,21 +257,41 @@ export function NodeView({
             }}
             onMouseUp={() => onPortMouseUp?.(port.name, 'input')}
           >
-            <title>{port.name} (input)</title>
+            <title>{`${port.name} (${port.type}, input)`}</title>
+            {isCompatible && (
+              <animate
+                attributeName="r"
+                values={`${PORT_RADIUS};${PORT_RADIUS + 3};${PORT_RADIUS}`}
+                dur="0.8s"
+                repeatCount="indefinite"
+              />
+            )}
+            {isCompatible && (
+              <animate
+                attributeName="strokeWidth"
+                values="1.5;3;1.5"
+                dur="0.8s"
+                repeatCount="indefinite"
+              />
+            )}
           </circle>
         );
       })}
-      {outputPorts.map((port, idx) => {
-        const cy = rect.y + headerHeight + fieldAreaHeight / 2 + (idx - (outputPorts.length - 1) / 2) * PORT_SPACING;
+      {outputPorts.map((port) => {
+        const portColor = getPortTypeColor(port.type);
+        const portKey = `${node.id}:${port.name}:output`;
+        const isCompatible = isDragActive && targetDirection === 'output' && compatiblePortKeys?.has(portKey) === true;
+        const isIncompatible = isDragActive && targetDirection === 'output' && compatiblePortKeys !== null && !compatiblePortKeys.has(portKey);
         return (
           <circle
             key={`out-${port.name}`}
-            cx={rect.x + rect.width}
-            cy={cy}
+            cx={port.position.x}
+            cy={port.position.y}
             r={PORT_RADIUS}
-            fill={isSelected || isDragging ? color : '#08080f'}
-            stroke={color}
-            strokeWidth="1.5"
+            fill={port.type === 'void' ? '#08080f' : (isSelected || isDragging || port.isConnected ? portColor : '#08080f')}
+            stroke={portColor}
+            strokeWidth={isIncompatible ? '1' : '1.5'}
+            strokeOpacity={isIncompatible ? 0.3 : 1}
             style={{ cursor: 'crosshair' }}
             onMouseDown={(e: React.MouseEvent) => {
               e.stopPropagation();
@@ -268,7 +299,23 @@ export function NodeView({
             }}
             onMouseUp={() => onPortMouseUp?.(port.name, 'output')}
           >
-            <title>{port.name} (output)</title>
+            <title>{`${port.name} (${port.type}, output)`}</title>
+            {isCompatible && (
+              <animate
+                attributeName="r"
+                values={`${PORT_RADIUS};${PORT_RADIUS + 3};${PORT_RADIUS}`}
+                dur="0.8s"
+                repeatCount="indefinite"
+              />
+            )}
+            {isCompatible && (
+              <animate
+                attributeName="strokeWidth"
+                values="1.5;3;1.5"
+                dur="0.8s"
+                repeatCount="indefinite"
+              />
+            )}
           </circle>
         );
       })}

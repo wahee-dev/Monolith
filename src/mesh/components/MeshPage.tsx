@@ -2,12 +2,14 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { createLatticeNodeId } from '@lattice/types';
-import type { LatticeState, LatticeNode, LatticeNodeId, LatticeNodeKind, LatticeConnection, NodeSchema } from '@lattice/types';
+import type { LatticeState, LatticeNode, LatticeNodeId, LatticeNodeKind, LatticeConnection, NodeSchema, SchemaField } from '@lattice/types';
 import type { Point } from '@mesh/types';
+import type { PortType } from '@engine/types';
 import { parseAndTypeCheck } from '@lattice/expression';
 import { MeshCanvas, useMeshProjection } from '@mesh/index';
 import { useTypeCheckGuard } from '@mesh/hooks/useTypeCheckGuard';
 import type { TypeCheckDiagnostic } from '@law/typecheck';
+import { getNodeTypeDefinition } from '@engine/registry';
 
 const ALL_KINDS: ReadonlyArray<LatticeNodeKind> = ['source', 'transform', 'sink', 'gate', 'merge', 'split'];
 
@@ -48,6 +50,31 @@ const KIND_SCHEMAS: Record<LatticeNodeKind, NodeSchema> = {
     },
   },
 };
+
+function getSchemaForKind(kind: LatticeNodeKind): NodeSchema {
+  const regResult = getNodeTypeDefinition(kind);
+  if (regResult.ok) {
+    const def = regResult.value;
+    const input: Record<string, SchemaField> = {};
+    for (let i = 0; i < def.inputs.length; i++) {
+      const port = def.inputs[i]!;
+      const t = port.type;
+      const fieldType: 'string' | 'number' | 'boolean' | 'object' | 'array' =
+        (t === 'string' || t === 'number' || t === 'boolean' || t === 'object' || t === 'array') ? t : 'string';
+      input[port.name] = { name: port.label, type: fieldType, required: true };
+    }
+    const output: Record<string, SchemaField> = {};
+    for (let i = 0; i < def.outputs.length; i++) {
+      const port = def.outputs[i]!;
+      const t = port.type;
+      const fieldType: 'string' | 'number' | 'boolean' | 'object' | 'array' =
+        (t === 'string' || t === 'number' || t === 'boolean' || t === 'object' || t === 'array') ? t : 'string';
+      output[port.name] = { name: port.label, type: fieldType, required: true };
+    }
+    return { input, output };
+  }
+  return KIND_SCHEMAS[kind];
+}
 
 function createEmptyLatticeState(): LatticeState {
   return {
@@ -258,10 +285,11 @@ export default function MeshPage({ onStateChange }: MeshPageProps): React.ReactE
       const nextCount = currentCount + 1;
       kindCounters.current.set(kind, nextCount);
       const id = createLatticeNodeId(`${kind}-${nextCount}-${Date.now()}`);
+      const schema = getSchemaForKind(kind);
       const newNode: LatticeNode = {
         id,
         kind,
-        schema: KIND_SCHEMAS[kind],
+        schema,
       };
 
       const x = 200 + Math.random() * 100;
@@ -316,6 +344,13 @@ export default function MeshPage({ onStateChange }: MeshPageProps): React.ReactE
     setEditingNodeId(null);
   }, [selectedNodeId]);
 
+  const handleConnectionValidationError = useCallback(
+    (fromType: PortType, toType: PortType): void => {
+      setErrorMessage(`Type mismatch: cannot connect ${fromType} output to ${toType} input`);
+    },
+    [],
+  );
+
   const handleConnectionCreate = useCallback(
     (fromNodeId: string, fromPort: string, toNodeId: string, toPort: string): void => {
       const connId = `conn-${Date.now()}`;
@@ -331,6 +366,7 @@ export default function MeshPage({ onStateChange }: MeshPageProps): React.ReactE
         connections: [...prev.connections, newConn],
         version: prev.version + 1,
       }));
+      setErrorMessage('');
     },
     [],
   );
@@ -584,6 +620,7 @@ export default function MeshPage({ onStateChange }: MeshPageProps): React.ReactE
           onExpressionCommit={handleExpressionCommit}
           onExpressionCancel={handleExpressionCancel}
           onConnectionCreate={handleConnectionCreate}
+          onConnectionValidationError={handleConnectionValidationError}
           onEdgeSelect={handleEdgeSelect}
           existingConnections={state.connections.map((c) => ({
             from: c.from as string,

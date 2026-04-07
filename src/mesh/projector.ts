@@ -1,6 +1,8 @@
 import type { LatticeState, LatticeNode } from '@lattice/types';
 import type { LawResult } from '@law/types';
-import type { NodeView, EdgeView, MeshView, FieldView, TypeStatus, PortInfo } from './types';
+import type { PortType } from '@engine/types';
+import type { NodeView, EdgeView, MeshView, FieldView, TypeStatus, PortView } from './types';
+import { getPortTypeColor } from './types';
 import { computeLayout } from './layout';
 import { computeBezierPath, computeBounds } from './geometry';
 import { renderStringField } from './renderers/string';
@@ -9,6 +11,7 @@ import { renderBooleanField } from './renderers/boolean';
 import { renderObjectField } from './renderers/object';
 import { renderArrayField } from './renderers/array';
 import { NODE_BASE_HEIGHT, FIELD_HEIGHT } from './layout';
+import { getNodeTypeDefinition } from '@engine/registry';
 
 const KIND_COLORS: Record<string, string> = {
   source: '#4a9eff',
@@ -28,6 +31,10 @@ const KIND_LABELS: Record<string, string> = {
   split: 'Split',
 };
 
+const PORT_SPACING = 22;
+const HEADER_HEIGHT = 28;
+const MIN_PORT_SPACING = 20;
+
 function renderFieldByType(type: FieldView['type'], value: unknown): string {
   switch (type) {
     case 'string':
@@ -45,17 +52,78 @@ function renderFieldByType(type: FieldView['type'], value: unknown): string {
   }
 }
 
-function buildNodePorts(node: LatticeNode): ReadonlyArray<PortInfo> {
-  const ports: PortInfo[] = [];
+function getPortTypeFromSchema(
+  node: LatticeNode,
+  portName: string,
+  direction: 'input' | 'output',
+): PortType {
+  const regResult = getNodeTypeDefinition(node.kind);
+  if (regResult.ok) {
+    const ports = direction === 'input' ? regResult.value.inputs : regResult.value.outputs;
+    for (let i = 0; i < ports.length; i++) {
+      if (ports[i]!.name === portName) {
+        return ports[i]!.type;
+      }
+    }
+  }
+  const schemaPorts = direction === 'input' ? node.schema.input : node.schema.output;
+  const field = schemaPorts[portName];
+  if (field !== undefined) {
+    const t = field.type;
+    if (t === 'string' || t === 'number' || t === 'boolean' || t === 'object' || t === 'array') {
+      return t;
+    }
+  }
+  return 'any';
+}
+
+function buildNodePorts(
+  node: LatticeNode,
+  rect: { readonly x: number; readonly y: number; readonly width: number; readonly height: number },
+  connections: ReadonlyArray<{ readonly from: string; readonly to: string; readonly fromPort: string; readonly toPort: string }>,
+): ReadonlyArray<PortView> {
+  const ports: PortView[] = [];
+  const nodeId = node.id as string;
+
+  const isInputConnected = (portName: string): boolean =>
+    connections.some((c) => c.to === nodeId && c.toPort === portName);
+  const isOutputConnected = (portName: string): boolean =>
+    connections.some((c) => c.from === nodeId && c.fromPort === portName);
+
   const inputKeys = Object.keys(node.schema.input).sort();
+  const inputCount = inputKeys.length;
+  const spacing = Math.max(PORT_SPACING, MIN_PORT_SPACING);
+  const fieldAreaHeight = rect.height - HEADER_HEIGHT;
+  const inputStartY = inputCount === 1
+    ? rect.y + HEADER_HEIGHT + fieldAreaHeight / 2
+    : rect.y + HEADER_HEIGHT + fieldAreaHeight / 2 - ((inputCount - 1) * spacing) / 2;
+
   for (let i = 0; i < inputKeys.length; i++) {
     const key = inputKeys[i]!;
-    ports.push({ name: key, direction: 'input' });
+    ports.push({
+      name: key,
+      type: getPortTypeFromSchema(node, key, 'input'),
+      direction: 'input',
+      position: { x: rect.x, y: inputStartY + i * spacing },
+      isConnected: isInputConnected(key),
+    });
   }
+
   const outputKeys = Object.keys(node.schema.output).sort();
+  const outputCount = outputKeys.length;
+  const outputStartY = outputCount === 1
+    ? rect.y + HEADER_HEIGHT + fieldAreaHeight / 2
+    : rect.y + HEADER_HEIGHT + fieldAreaHeight / 2 - ((outputCount - 1) * spacing) / 2;
+
   for (let i = 0; i < outputKeys.length; i++) {
     const key = outputKeys[i]!;
-    ports.push({ name: key, direction: 'output' });
+    ports.push({
+      name: key,
+      type: getPortTypeFromSchema(node, key, 'output'),
+      direction: 'output',
+      position: { x: rect.x + rect.width, y: outputStartY + i * spacing },
+      isConnected: isOutputConnected(key),
+    });
   }
   return ports;
 }
@@ -122,6 +190,12 @@ function buildNodeViews(
   }
 
   const kindRunningCounters = new Map<string, number>();
+  const connectionData = state.connections.map((c) => ({
+    from: c.from as string,
+    to: c.to as string,
+    fromPort: c.fromPort,
+    toPort: c.toPort,
+  }));
 
   for (let i = 0; i < nodeEntries.length; i++) {
     const [nodeId, node] = nodeEntries[i]!;
@@ -131,7 +205,7 @@ function buildNodeViews(
 
     const nodeValue = state.values.get(nodeId);
     const fields = buildNodeFields(node, nodeValue, rect);
-    const ports = buildNodePorts(node);
+    const ports = buildNodePorts(node, rect, connectionData);
     const color = KIND_COLORS[node.kind] ?? '#888888';
     const runningCount = (kindRunningCounters.get(node.kind) ?? 0) + 1;
     kindRunningCounters.set(node.kind, runningCount);
@@ -158,6 +232,20 @@ function buildNodeViews(
   return views;
 }
 
+function getPortTypeFromNodeView(
+  nodeView: NodeView,
+  portName: string,
+  direction: 'input' | 'output',
+): PortType {
+  for (let i = 0; i < nodeView.ports.length; i++) {
+    const port = nodeView.ports[i]!;
+    if (port.name === portName && port.direction === direction) {
+      return port.type;
+    }
+  }
+  return 'any';
+}
+
 function buildEdgeViews(
   state: LatticeState,
   nodeViews: ReadonlyArray<NodeView>,
@@ -181,13 +269,17 @@ function buildEdgeViews(
     if (fromView === undefined || toView === undefined) continue;
 
     const curve = computeBezierPath(fromView.rect, toView.rect);
+    const portType = getPortTypeFromNodeView(fromView, conn.fromPort, 'output');
+    const edgeColor = getPortTypeColor(portType);
+
     edges.push({
       id: conn.id,
       fromNodeId: conn.from as string,
       toNodeId: conn.to as string,
       curve,
       label: `${conn.fromPort} → ${conn.toPort}`,
-      color: '#666666',
+      color: edgeColor,
+      portType,
     });
   }
 

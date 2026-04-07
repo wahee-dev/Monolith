@@ -2,6 +2,7 @@
 
 import { useCallback, useMemo } from 'react';
 import type { MeshView, Point } from '../types';
+import type { PortType } from '@engine/types';
 import { useInfiniteCanvas } from '../hooks/useInfiniteCanvas';
 import { useNodeDrag } from '../hooks/useNodeDrag';
 import { useConnectionDrag } from '../hooks/useConnectionDrag';
@@ -9,6 +10,13 @@ import { NodeView as NodeViewComponent } from './NodeView';
 import { EdgeView } from './EdgeView';
 import { ExpressionEditor } from './ExpressionEditor';
 import { computeBezierPath } from '../geometry';
+
+interface PortInfoForDrag {
+  readonly nodeId: string;
+  readonly portName: string;
+  readonly portType: PortType;
+  readonly direction: 'input' | 'output';
+}
 
 interface MeshCanvasProps {
   readonly view: MeshView;
@@ -23,6 +31,7 @@ interface MeshCanvasProps {
   readonly onExpressionCommit: (nodeId: string, expression: string) => void;
   readonly onExpressionCancel: () => void;
   readonly onConnectionCreate: (fromNodeId: string, fromPort: string, toNodeId: string, toPort: string) => void;
+  readonly onConnectionValidationError?: (fromType: PortType, toType: PortType) => void;
   readonly onEdgeSelect: (edgeId: string | null) => void;
   readonly existingConnections: ReadonlyArray<{
     readonly from: string;
@@ -79,6 +88,7 @@ export function MeshCanvas({
   onExpressionCommit,
   onExpressionCancel,
   onConnectionCreate,
+  onConnectionValidationError,
   onEdgeSelect,
   existingConnections,
 }: MeshCanvasProps): React.ReactElement {
@@ -90,17 +100,46 @@ export function MeshCanvas({
     nodePositions,
     onNodeMove,
   });
+
+  const getAllPorts = useCallback((): ReadonlyArray<PortInfoForDrag> => {
+    const ports: PortInfoForDrag[] = [];
+    for (let i = 0; i < view.nodes.length; i++) {
+      const node = view.nodes[i]!;
+      for (let j = 0; j < node.ports.length; j++) {
+        const port = node.ports[j]!;
+        ports.push({
+          nodeId: node.id,
+          portName: port.name,
+          portType: port.type,
+          direction: port.direction,
+        });
+      }
+    }
+    return ports;
+  }, [view.nodes]);
+
   const connDrag = useConnectionDrag({
     screenToWorld: canvas.screenToWorld,
     existingConnections,
     onConnectionCreate,
+    onConnectionValidationError: onConnectionValidationError ?? ((_f: PortType, _t: PortType) => {}),
+    getAllPorts,
   });
 
   const positionedNodes = useMemo(() => {
     return view.nodes.map((node) => {
       const pos = nodePositions.get(node.id);
       if (pos !== undefined) {
-        return { ...node, rect: { ...node.rect, x: pos.x, y: pos.y } };
+        const dx = pos.x - node.rect.x;
+        const dy = pos.y - node.rect.y;
+        return {
+          ...node,
+          rect: { ...node.rect, x: pos.x, y: pos.y },
+          ports: node.ports.map((p) => ({
+            ...p,
+            position: { x: p.position.x + dx, y: p.position.y + dy },
+          })),
+        };
       }
       return node;
     });
@@ -176,19 +215,13 @@ export function MeshCanvas({
     if (activeDrag === null) return null;
     const sourceNode = nodeMap.get(activeDrag.sourceNodeId);
     if (sourceNode === undefined) return null;
-    const isOutput = activeDrag.sourcePortType === 'output';
-    const portIndex = sourceNode.ports
-      .filter((p) => p.direction === activeDrag.sourcePortType)
-      .findIndex((p) => p.name === activeDrag.sourcePort);
-    if (portIndex === -1) return null;
-    const portsOfDirection = sourceNode.ports.filter((p) => p.direction === activeDrag.sourcePortType);
-    const headerHeight = 28;
-    const fieldAreaHeight = sourceNode.rect.height - headerHeight;
-    const spacing = 22;
-    const cy = sourceNode.rect.y + headerHeight + fieldAreaHeight / 2 + (portIndex - (portsOfDirection.length - 1) / 2) * spacing;
+    const port = sourceNode.ports.find(
+      (p) => p.direction === activeDrag.sourcePortType && p.name === activeDrag.sourcePort,
+    );
+    if (port === undefined) return null;
     return {
-      x: isOutput ? sourceNode.rect.x + sourceNode.rect.width : sourceNode.rect.x,
-      y: cy,
+      x: port.position.x,
+      y: port.position.y,
     };
   }, [activeDrag, nodeMap]);
 
@@ -206,6 +239,10 @@ export function MeshCanvas({
     const ctrlOffset = isOutput ? offset : -offset;
     return `M ${sx} ${sy} C ${sx + ctrlOffset} ${sy}, ${ex - ctrlOffset} ${ey}, ${ex} ${ey}`;
   }, [dragStartPoint, activeDrag]);
+
+  const draggingPortType: PortType | null = activeDrag?.sourcePortDataType ?? null;
+  const draggingPortDirection: 'input' | 'output' | null = activeDrag?.sourcePortType ?? null;
+  const compatiblePortKeys: ReadonlySet<string> | null = activeDrag?.compatibleTargetPorts ?? null;
 
   const vb = canvas.svgProps.viewBox.split(' ');
   const vbX = Number(vb[0] ?? 0);
@@ -244,6 +281,9 @@ export function MeshCanvas({
           isEditing={node.id === editingNodeId}
           isDragging={node.id === drag.draggingNodeId}
           isBlocking={isBlocking}
+          compatiblePortKeys={compatiblePortKeys}
+          draggingPortType={draggingPortType}
+          draggingPortDirection={draggingPortDirection}
           onMouseDown={(e: React.MouseEvent<SVGGElement>) => handleNodeMouseDown(node.id, e)}
           onDoubleClick={() => onNodeDoubleClick(node.id)}
           onPortMouseDown={(portName: string, portType: 'input' | 'output', e: React.MouseEvent) =>

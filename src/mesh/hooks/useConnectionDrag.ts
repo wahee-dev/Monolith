@@ -2,6 +2,15 @@
 
 import { useCallback, useRef, useState } from 'react';
 import type { ConnectionDragState, BezierCurve, Point } from '../types';
+import type { PortType } from '@engine/types';
+import { canConnectTypes } from '@engine/validator';
+
+interface PortInfo {
+  readonly nodeId: string;
+  readonly portName: string;
+  readonly portType: PortType;
+  readonly direction: 'input' | 'output';
+}
 
 interface UseConnectionDragOptions {
   readonly screenToWorld: (screenX: number, screenY: number) => Point;
@@ -12,6 +21,8 @@ interface UseConnectionDragOptions {
     readonly toPort: string;
   }>;
   readonly onConnectionCreate: (fromNodeId: string, fromPort: string, toNodeId: string, toPort: string) => void;
+  readonly onConnectionValidationError?: (fromType: PortType, toType: PortType) => void;
+  readonly getAllPorts: () => ReadonlyArray<PortInfo>;
 }
 
 interface TempEdge {
@@ -39,25 +50,69 @@ function computeTempBezier(start: Point, end: Point): BezierCurve {
 }
 
 export function useConnectionDrag(options: UseConnectionDragOptions): UseConnectionDragResult {
-  const { screenToWorld, existingConnections, onConnectionCreate } = options;
+  const { screenToWorld, existingConnections, onConnectionCreate, onConnectionValidationError, getAllPorts } = options;
   const [dragState, setDragState] = useState<ConnectionDragState | null>(null);
-  const sourceRef = useRef<ConnectionDragState | null>(null);
+  const sourceRef = useRef<{
+    readonly nodeId: string;
+    readonly portName: string;
+    readonly portType: 'input' | 'output';
+    readonly portDataType: PortType;
+  } | null>(null);
+
+  const computeCompatibleTargets = useCallback(
+    (sourceNodeId: string, _sourcePortName: string, sourceDirection: 'input' | 'output', sourceDataType: PortType): ReadonlySet<string> => {
+      const compatible = new Set<string>();
+      const targetDirection = sourceDirection === 'output' ? 'input' : 'output';
+      const allPorts = getAllPorts();
+
+      for (let i = 0; i < allPorts.length; i++) {
+        const port = allPorts[i]!;
+        if (port.nodeId === sourceNodeId) continue;
+        if (port.direction !== targetDirection) continue;
+
+        const fromType = sourceDirection === 'output' ? sourceDataType : port.portType;
+        const toType = sourceDirection === 'output' ? port.portType : sourceDataType;
+
+        if (canConnectTypes(fromType, toType)) {
+          compatible.add(`${port.nodeId}:${port.portName}:${port.direction}`);
+        }
+      }
+      return compatible;
+    },
+    [getAllPorts],
+  );
 
   const onPortMouseDown = useCallback(
     (nodeId: string, portName: string, portType: 'input' | 'output', e: React.MouseEvent): void => {
       e.stopPropagation();
       e.preventDefault();
       const worldPoint = screenToWorld(e.clientX, e.clientY);
+
+      const allPorts = getAllPorts();
+      let portDataType: PortType = 'any';
+      for (let i = 0; i < allPorts.length; i++) {
+        const p = allPorts[i]!;
+        if (p.nodeId === nodeId && p.portName === portName && p.direction === portType) {
+          portDataType = p.portType;
+          break;
+        }
+      }
+
+      sourceRef.current = { nodeId, portName, portType, portDataType };
+
+      const compatibleTargetPorts = computeCompatibleTargets(nodeId, portName, portType, portDataType);
+
       const newDragState: ConnectionDragState = {
         sourceNodeId: nodeId,
         sourcePort: portName,
         sourcePortType: portType,
+        sourcePortDataType: portDataType,
         currentPoint: worldPoint,
+        compatibleTargetPorts,
       };
-      sourceRef.current = newDragState;
       setDragState(newDragState);
     },
-    [screenToWorld],
+    [screenToWorld, getAllPorts, computeCompatibleTargets],
   );
 
   const onCanvasMouseMove = useCallback(
@@ -77,7 +132,7 @@ export function useConnectionDrag(options: UseConnectionDragOptions): UseConnect
       const source = sourceRef.current;
       if (source === null) return;
 
-      if (source.sourceNodeId === targetNodeId) {
+      if (source.nodeId === targetNodeId) {
         sourceRef.current = null;
         setDragState(null);
         return;
@@ -87,18 +142,47 @@ export function useConnectionDrag(options: UseConnectionDragOptions): UseConnect
       let fromPort: string;
       let toNodeId: string;
       let toPort: string;
+      let fromDataType: PortType;
+      let toDataType: PortType;
 
-      if (source.sourcePortType === 'output' && targetPortType === 'input') {
-        fromNodeId = source.sourceNodeId;
-        fromPort = source.sourcePort;
+      if (source.portType === 'output' && targetPortType === 'input') {
+        fromNodeId = source.nodeId;
+        fromPort = source.portName;
         toNodeId = targetNodeId;
         toPort = targetPortName;
-      } else if (source.sourcePortType === 'input' && targetPortType === 'output') {
+        fromDataType = source.portDataType;
+        const allPorts = getAllPorts();
+        toDataType = 'any';
+        for (let i = 0; i < allPorts.length; i++) {
+          const p = allPorts[i]!;
+          if (p.nodeId === targetNodeId && p.portName === targetPortName && p.direction === 'input') {
+            toDataType = p.portType;
+            break;
+          }
+        }
+      } else if (source.portType === 'input' && targetPortType === 'output') {
         fromNodeId = targetNodeId;
         fromPort = targetPortName;
-        toNodeId = source.sourceNodeId;
-        toPort = source.sourcePort;
+        toNodeId = source.nodeId;
+        toPort = source.portName;
+        const allPorts = getAllPorts();
+        fromDataType = 'any';
+        for (let i = 0; i < allPorts.length; i++) {
+          const p = allPorts[i]!;
+          if (p.nodeId === targetNodeId && p.portName === targetPortName && p.direction === 'output') {
+            fromDataType = p.portType;
+            break;
+          }
+        }
+        toDataType = source.portDataType;
       } else {
+        sourceRef.current = null;
+        setDragState(null);
+        return;
+      }
+
+      if (!canConnectTypes(fromDataType, toDataType)) {
+        onConnectionValidationError?.(fromDataType, toDataType);
         sourceRef.current = null;
         setDragState(null);
         return;
@@ -119,7 +203,7 @@ export function useConnectionDrag(options: UseConnectionDragOptions): UseConnect
       sourceRef.current = null;
       setDragState(null);
     },
-    [existingConnections, onConnectionCreate],
+    [existingConnections, onConnectionCreate, onConnectionValidationError, getAllPorts],
   );
 
   const onCanvasMouseUp = useCallback((): void => {

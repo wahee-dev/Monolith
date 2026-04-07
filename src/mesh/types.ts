@@ -1,6 +1,7 @@
 import type { LatticeNodeKind } from '@lattice/types';
 import type { LawResult } from '@law/types';
 import type { LatticeState } from '@lattice/types';
+import type { PortType } from '@engine/types';
 
 export interface Point {
   readonly x: number;
@@ -35,9 +36,31 @@ export interface CanvasState {
   readonly zoom: number;
 }
 
+export const PORT_TYPE_COLORS: Record<PortType, string> = {
+  string: '#4a9eff',
+  number: '#22c55e',
+  boolean: '#f59e0b',
+  object: '#9f4aff',
+  array: '#ff9f4a',
+  any: '#888888',
+  void: 'transparent',
+} as const;
+
+export function getPortTypeColor(portType: PortType): string {
+  return PORT_TYPE_COLORS[portType] ?? '#888888';
+}
+
 export interface PortInfo {
   readonly name: string;
   readonly direction: 'input' | 'output';
+}
+
+export interface PortView {
+  readonly name: string;
+  readonly type: PortType;
+  readonly direction: 'input' | 'output';
+  readonly position: Point;
+  readonly isConnected: boolean;
 }
 
 export interface NodeView {
@@ -46,7 +69,7 @@ export interface NodeView {
   readonly kind: LatticeNodeKind;
   readonly label: string;
   readonly fields: ReadonlyArray<FieldView>;
-  readonly ports: ReadonlyArray<PortInfo>;
+  readonly ports: ReadonlyArray<PortView>;
   readonly color: string;
   readonly expression: string;
   readonly typeStatus: TypeStatus;
@@ -57,7 +80,9 @@ export interface ConnectionDragState {
   readonly sourceNodeId: string;
   readonly sourcePort: string;
   readonly sourcePortType: 'input' | 'output';
+  readonly sourcePortDataType: PortType;
   readonly currentPoint: Point;
+  readonly compatibleTargetPorts: ReadonlySet<string>;
 }
 
 export interface EdgeView {
@@ -67,6 +92,7 @@ export interface EdgeView {
   readonly curve: BezierCurve;
   readonly label: string;
   readonly color: string;
+  readonly portType: PortType;
 }
 
 export interface MeshView {
