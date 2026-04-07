@@ -36,6 +36,9 @@
       ],
       "@preview/*": [
         "preview/*"
+      ],
+      "@engine/*": [
+        "engine/*"
       ]
     },
     "plugins": [
