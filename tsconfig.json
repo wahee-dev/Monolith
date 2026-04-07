@@ -48,6 +48,9 @@
       ],
       "@minimap/*": [
         "minimap/*"
+      ],
+      "@templates/*": [
+        "templates/*"
       ]
     },
     "plugins": [
