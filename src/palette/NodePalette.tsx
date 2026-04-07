@@ -139,14 +139,14 @@ export function NodePalette({
     return (
       <div
         style={{
-          width: '36px',
+          width: '32px',
           height: '100%',
           backgroundColor: '#0c0c14',
           borderRight: '1px solid #2a2a3e',
           display: 'flex',
           flexDirection: 'column',
           alignItems: 'center',
-          paddingTop: '8px',
+          paddingTop: '6px',
           flexShrink: 0,
           fontFamily: 'monospace',
         }}
@@ -159,8 +159,8 @@ export function NodePalette({
             color: '#888888',
             border: 'none',
             cursor: 'pointer',
-            fontSize: '18px',
-            padding: '4px',
+            fontSize: '16px',
+            padding: '2px',
             fontFamily: 'monospace',
           }}
           title="Open palette"
@@ -188,8 +188,8 @@ export function NodePalette({
         style={{
           display: 'flex',
           alignItems: 'center',
-          gap: '8px',
-          padding: '8px 10px',
+          gap: '6px',
+          padding: '6px 8px',
           borderBottom: '1px solid #2a2a3e',
           backgroundColor: '#14141f',
         }}
@@ -202,7 +202,7 @@ export function NodePalette({
             color: '#888888',
             border: 'none',
             cursor: 'pointer',
-            fontSize: '14px',
+            fontSize: '13px',
             padding: '0',
             fontFamily: 'monospace',
             lineHeight: 1,
@@ -219,13 +219,14 @@ export function NodePalette({
             placeholder="Search nodes..."
             style={{
               width: '100%',
+              height: '32px',
               backgroundColor: '#1a1a2e',
               color: '#e0e0e0',
               border: '1px solid #2a2a3e',
               borderRadius: '3px',
-              padding: '6px 8px 6px 24px',
+              padding: '0 8px 0 22px',
               fontFamily: 'monospace',
-              fontSize: '12px',
+              fontSize: '11px',
               outline: 'none',
               boxSizing: 'border-box',
             }}
@@ -233,11 +234,11 @@ export function NodePalette({
           <span
             style={{
               position: 'absolute',
-              left: '8px',
+              left: '7px',
               top: '50%',
               transform: 'translateY(-50%)',
-              color: '#888888',
-              fontSize: '12px',
+              color: '#666',
+              fontSize: '10px',
               pointerEvents: 'none',
             }}
           >
@@ -252,8 +253,8 @@ export function NodePalette({
           overflowX: 'auto',
           borderBottom: '1px solid #2a2a3e',
           backgroundColor: '#14141f',
-          padding: '4px 4px',
-          gap: '2px',
+          padding: '2px 4px',
+          gap: '1px',
           flexShrink: 0,
         }}
       >
@@ -277,14 +278,14 @@ export function NodePalette({
                 borderBottom: isActive ? `2px solid ${tabColor}` : '2px solid transparent',
                 borderRadius: '0',
                 cursor: 'pointer',
-                padding: '4px 8px',
-                fontSize: '10px',
+                padding: '2px 6px',
+                fontSize: '9px',
                 fontFamily: 'monospace',
                 textTransform: 'uppercase' as const,
                 whiteSpace: 'nowrap' as const,
                 display: 'flex',
                 alignItems: 'center',
-                gap: '4px',
+                gap: '3px',
               }}
             >
               {tab}
@@ -292,9 +293,9 @@ export function NodePalette({
                 style={{
                   backgroundColor: isActive ? `${tabColor}33` : '#2a2a3e',
                   color: isActive ? tabColor : '#888888',
-                  padding: '1px 4px',
-                  borderRadius: '8px',
-                  fontSize: '9px',
+                  padding: '0px 3px',
+                  borderRadius: '6px',
+                  fontSize: '8px',
                   fontFamily: 'monospace',
                 }}
               >
@@ -317,9 +318,9 @@ export function NodePalette({
           <div style={{ borderBottom: '1px solid #2a2a3e' }}>
             <div
               style={{
-                padding: '6px 10px',
-                color: '#888888',
-                fontSize: '10px',
+                padding: '4px 8px',
+                color: '#666',
+                fontSize: '9px',
                 fontWeight: 'bold',
                 textTransform: 'uppercase',
                 letterSpacing: '0.5px',
@@ -340,9 +341,9 @@ export function NodePalette({
             {recentDefinitions.length > 0 && (
               <div
                 style={{
-                  padding: '6px 10px',
-                  color: '#888888',
-                  fontSize: '10px',
+                  padding: '4px 8px',
+                  color: '#666',
+                  fontSize: '9px',
                   fontWeight: 'bold',
                   textTransform: 'uppercase',
                   letterSpacing: '0.5px',

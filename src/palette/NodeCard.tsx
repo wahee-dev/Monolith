@@ -37,11 +37,11 @@ export function NodeCard({ definition, onAddNode }: NodeCardProps): React.ReactE
         }
       }}
       style={{
-        height: '40px',
+        height: '34px',
         display: 'flex',
         alignItems: 'center',
-        gap: '8px',
-        padding: '0 10px',
+        gap: '6px',
+        padding: '0 8px',
         cursor: 'pointer',
         borderLeft: `3px solid ${categoryColor}`,
         backgroundColor: '#1a1a2e',
@@ -59,11 +59,11 @@ export function NodeCard({ definition, onAddNode }: NodeCardProps): React.ReactE
       }}
     >
       <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
           <span
             style={{
               color: categoryColor,
-              fontSize: '12px',
+              fontSize: '11px',
               fontWeight: 'bold',
               fontFamily: 'monospace',
               whiteSpace: 'nowrap',
@@ -76,8 +76,8 @@ export function NodeCard({ definition, onAddNode }: NodeCardProps): React.ReactE
         </div>
         <span
           style={{
-            color: '#888888',
-            fontSize: '10px',
+            color: '#777',
+            fontSize: '9px',
             fontFamily: 'monospace',
             whiteSpace: 'nowrap',
             overflow: 'hidden',
@@ -90,8 +90,8 @@ export function NodeCard({ definition, onAddNode }: NodeCardProps): React.ReactE
       </div>
       <span
         style={{
-          color: '#888888',
-          fontSize: '10px',
+          color: '#666',
+          fontSize: '9px',
           fontFamily: 'monospace',
           flexShrink: 0,
         }}
