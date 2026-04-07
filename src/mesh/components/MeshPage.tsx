@@ -1,9 +1,10 @@
 'use client';
 
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useState } from 'react';
 import { createLatticeNodeId } from '@lattice/types';
 import type { LatticeState, LatticeNode, LatticeNodeId, LatticeNodeKind } from '@lattice/types';
 import type { Point } from '@mesh/types';
+import { parseAndTypeCheck } from '@lattice/expression';
 import { MeshCanvas, useMeshProjection } from '@mesh/index';
 
 const ALL_KINDS: ReadonlyArray<LatticeNodeKind> = ['source', 'transform', 'sink', 'gate', 'merge', 'split'];
@@ -150,7 +151,11 @@ function extractInitialPositions(state: LatticeState): Map<string, Point> {
 
 export default function MeshPage(): React.ReactElement {
   const [state] = useState(() => createSampleLatticeState());
-  const view = useMeshProjection(state);
+  const [expressions, setExpressions] = useState<Map<string, string>>(new Map());
+  const [nodeTypeStatus, setNodeTypeStatus] = useState<Map<string, 'unchecked' | 'valid' | 'invalid'>>(new Map());
+  const [nodeTypeErrors, setNodeTypeErrors] = useState<Map<string, string>>(new Map());
+
+  const view = useMeshProjection(state, expressions, nodeTypeStatus, nodeTypeErrors);
 
   const [nodePositions, setNodePositions] = useState<Map<string, Point>>(
     () => {
@@ -166,19 +171,6 @@ export default function MeshPage(): React.ReactElement {
 
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
   const [editingNodeId, setEditingNodeId] = useState<string | null>(null);
-  const [expressions, setExpressions] = useState<Map<string, string>>(new Map());
-  const [nodeTypeStatus, setNodeTypeStatus] = useState<Map<string, 'unchecked' | 'valid' | 'invalid'>>(new Map());
-  const [nodeTypeErrors, setNodeTypeErrors] = useState<Map<string, string>>(new Map());
-
-  const enhancedView = useMemo(() => {
-    const nodes = view.nodes.map((node) => ({
-      ...node,
-      expression: expressions.get(node.id) ?? '',
-      typeStatus: nodeTypeStatus.get(node.id) ?? 'unchecked' as const,
-      typeError: nodeTypeErrors.get(node.id) ?? '',
-    }));
-    return { ...view, nodes };
-  }, [view, expressions, nodeTypeStatus, nodeTypeErrors]);
 
   const handleNodeMove = useCallback(
     (nodeId: string, newPosition: Point): void => {
@@ -253,6 +245,61 @@ export default function MeshPage(): React.ReactElement {
     setEditingNodeId(null);
   }, [selectedNodeId]);
 
+  const handleExpressionCommit = useCallback(
+    (nodeId: string, expression: string): void => {
+      setExpressions((prev) => {
+        const next = new Map(prev);
+        next.set(nodeId, expression);
+        return next;
+      });
+
+      if (expression.trim().length === 0) {
+        setNodeTypeStatus((prev) => {
+          const next = new Map(prev);
+          next.set(nodeId, 'unchecked');
+          return next;
+        });
+        setNodeTypeErrors((prev) => {
+          const next = new Map(prev);
+          next.delete(nodeId);
+          return next;
+        });
+      } else {
+        const result = parseAndTypeCheck(expression);
+        if (result.ok) {
+          setNodeTypeStatus((prev) => {
+            const next = new Map(prev);
+            next.set(nodeId, 'valid');
+            return next;
+          });
+          setNodeTypeErrors((prev) => {
+            const next = new Map(prev);
+            next.delete(nodeId);
+            return next;
+          });
+        } else {
+          setNodeTypeStatus((prev) => {
+            const next = new Map(prev);
+            next.set(nodeId, 'invalid');
+            return next;
+          });
+          setNodeTypeErrors((prev) => {
+            const next = new Map(prev);
+            next.set(nodeId, result.error.message);
+            return next;
+          });
+        }
+      }
+
+      setEditingNodeId(null);
+    },
+    [],
+  );
+
+  const handleExpressionCancel = useCallback((): void => {
+    setEditingNodeId(null);
+  }, []);
+
   return (
     <div style={{
       width: '100vw',
@@ -316,18 +363,20 @@ export default function MeshPage(): React.ReactElement {
           </span>
         )}
         <span style={{ marginLeft: 'auto', color: '#555555' }}>
-          {enhancedView.nodes.length} nodes · {enhancedView.edges.length} edges
+          {view.nodes.length} nodes · {view.edges.length} edges
         </span>
       </div>
       <div style={{ flex: 1, position: 'relative' }}>
         <MeshCanvas
-          view={enhancedView}
+          view={view}
           selectedNodeId={selectedNodeId}
           editingNodeId={editingNodeId}
           nodePositions={nodePositions}
           onNodeMove={handleNodeMove}
           onNodeSelect={handleNodeSelect}
           onNodeDoubleClick={handleNodeDoubleClick}
+          onExpressionCommit={handleExpressionCommit}
+          onExpressionCancel={handleExpressionCancel}
         />
       </div>
     </div>

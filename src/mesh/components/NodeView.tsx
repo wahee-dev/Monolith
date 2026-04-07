@@ -59,6 +59,19 @@ export function NodeView({
           </filter>
         </defs>
       )}
+      {typeStatus === 'valid' && (
+        <defs>
+          <filter id={`valid-glow-${node.id}`} x="-20%" y="-20%" width="140%" height="140%">
+            <feGaussianBlur stdDeviation="4" result="blur" />
+            <feFlood floodColor="#22c55e" floodOpacity="0.4" />
+            <feComposite in2="blur" operator="in" />
+            <feMerge>
+              <feMergeNode />
+              <feMergeNode in="SourceGraphic" />
+            </feMerge>
+          </filter>
+        </defs>
+      )}
       {typeStatus === 'invalid' && (
         <defs>
           <filter id={`error-glow-${node.id}`} x="-20%" y="-20%" width="140%" height="140%">
@@ -93,8 +106,23 @@ export function NodeView({
           rx="2"
           ry="2"
           fill={statusBorderColor}
-          filter={typeStatus === 'invalid' ? `url(#error-glow-${node.id})` : undefined}
-        />
+          filter={
+            typeStatus === 'invalid'
+              ? `url(#error-glow-${node.id})`
+              : typeStatus === 'valid'
+                ? `url(#valid-glow-${node.id})`
+                : undefined
+          }
+        >
+          {typeStatus === 'invalid' && (
+            <animate
+              attributeName="opacity"
+              values="1;0.4;1"
+              dur="1.5s"
+              repeatCount="indefinite"
+            />
+          )}
+        </rect>
       )}
       <rect
         x={rect.x}
