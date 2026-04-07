@@ -26,7 +26,7 @@ const PRINT_5_TIMES: Template = {
   id: 'print-5-times',
   name: 'Print 5 Times',
   description:
-    'Uses a Template node to repeat a message. A Constant provides the text, a second Constant provides the repeat count, and a Console Log displays the result.',
+    'Uses a Template node to format a message. A Constant provides the text, a Template node interpolates it, and a Console Log displays the result.',
   category: 'tutorial',
   nodes: [
     {
@@ -35,14 +35,9 @@ const PRINT_5_TIMES: Template = {
       expressions: { value: 'My Message' },
     },
     {
-      kind: 'constant',
-      position: { x: -300, y: 120 },
-      expressions: { value: '5' },
-    },
-    {
       kind: 'template',
       position: { x: 0, y: 0 },
-      expressions: { template: '{{text}} repeated {{count}} times' },
+      expressions: { template: '{{text}} repeated 5 times' },
     },
     {
       kind: 'console-log',
@@ -50,8 +45,8 @@ const PRINT_5_TIMES: Template = {
     },
   ],
   connections: [
-    { fromNodeId: 0, fromPort: 'value', toNodeId: 2, toPort: 'data' },
-    { fromNodeId: 2, fromPort: 'result', toNodeId: 3, toPort: 'value' },
+    { fromNodeId: 0, fromPort: 'value', toNodeId: 1, toPort: 'data' },
+    { fromNodeId: 1, fromPort: 'result', toNodeId: 2, toPort: 'value' },
   ],
 } as const;
 
