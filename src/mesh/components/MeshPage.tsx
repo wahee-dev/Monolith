@@ -1,670 +1,177 @@
 'use client';
 
-import { useCallback, useEffect, useRef, useState } from 'react';
-import { createLatticeNodeId } from '@lattice/types';
-import type { LatticeState, LatticeNode, LatticeNodeId, LatticeNodeKind, LatticeConnection, NodeSchema, SchemaField } from '@lattice/types';
+import { useMemo } from 'react';
+import type { LatticeState } from '@lattice/types';
 import type { Point } from '@mesh/types';
-import type { PortType } from '@engine/types';
-import { parseAndTypeCheck } from '@lattice/expression';
+import type { PortType, GraphValidation, GraphExecutionResult } from '@engine/types';
+import type { ExecutionState } from '@engine/execution';
 import { MeshCanvas, useMeshProjection } from '@mesh/index';
-import { useTypeCheckGuard } from '@mesh/hooks/useTypeCheckGuard';
-import type { TypeCheckDiagnostic } from '@law/typecheck';
-import { getNodeTypeDefinition } from '@engine/registry';
-
-const ALL_KINDS: ReadonlyArray<LatticeNodeKind> = ['source', 'transform', 'sink', 'gate', 'merge', 'split'];
-
-type ExecutionStatus = 'idle' | 'running' | 'blocked' | 'stopped';
-
-const KIND_SCHEMAS: Record<LatticeNodeKind, NodeSchema> = {
-  source: {
-    input: {},
-    output: { emit: { name: 'emit', type: 'string', required: true } },
-  },
-  transform: {
-    input: { input: { name: 'input', type: 'string', required: true } },
-    output: { output: { name: 'output', type: 'string', required: true } },
-  },
-  sink: {
-    input: { receive: { name: 'receive', type: 'string', required: true } },
-    output: {},
-  },
-  gate: {
-    input: {
-      condition: { name: 'condition', type: 'boolean', required: true },
-      data: { name: 'data', type: 'string', required: true },
-    },
-    output: { passed: { name: 'passed', type: 'string', required: true } },
-  },
-  merge: {
-    input: {
-      a: { name: 'a', type: 'string', required: true },
-      b: { name: 'b', type: 'string', required: true },
-    },
-    output: { merged: { name: 'merged', type: 'string', required: true } },
-  },
-  split: {
-    input: { input: { name: 'input', type: 'string', required: true } },
-    output: {
-      left: { name: 'left', type: 'string', required: true },
-      right: { name: 'right', type: 'string', required: true },
-    },
-  },
-};
-
-function getSchemaForKind(kind: LatticeNodeKind): NodeSchema {
-  const regResult = getNodeTypeDefinition(kind);
-  if (regResult.ok) {
-    const def = regResult.value;
-    const input: Record<string, SchemaField> = {};
-    for (let i = 0; i < def.inputs.length; i++) {
-      const port = def.inputs[i]!;
-      const t = port.type;
-      const fieldType: 'string' | 'number' | 'boolean' | 'object' | 'array' =
-        (t === 'string' || t === 'number' || t === 'boolean' || t === 'object' || t === 'array') ? t : 'string';
-      input[port.name] = { name: port.label, type: fieldType, required: true };
-    }
-    const output: Record<string, SchemaField> = {};
-    for (let i = 0; i < def.outputs.length; i++) {
-      const port = def.outputs[i]!;
-      const t = port.type;
-      const fieldType: 'string' | 'number' | 'boolean' | 'object' | 'array' =
-        (t === 'string' || t === 'number' || t === 'boolean' || t === 'object' || t === 'array') ? t : 'string';
-      output[port.name] = { name: port.label, type: fieldType, required: true };
-    }
-    return { input, output };
-  }
-  return KIND_SCHEMAS[kind];
-}
-
-function createEmptyLatticeState(): LatticeState {
-  return {
-    nodes: new Map<LatticeNodeId, LatticeNode>(),
-    connections: [],
-    values: new Map(),
-    status: 'idle',
-    version: 0,
-  };
-}
-
-function extractInitialPositions(state: LatticeState): Map<string, Point> {
-  const positions = new Map<string, Point>();
-  const nodeList = Array.from(state.nodes.values());
-  let xOffset = 80;
-  let yOffset = 60;
-  const yOffsetStart = 60;
-  const layerGapX = 300;
-  const maxColumnHeight = 500;
-
-  for (let i = 0; i < nodeList.length; i++) {
-    const node = nodeList[i]!;
-    const inputCount = Object.keys(node.schema.input).length;
-    const outputCount = Object.keys(node.schema.output).length;
-    const height = 60 + (inputCount + outputCount) * 24;
-
-    positions.set(node.id as string, { x: xOffset, y: yOffset });
-    yOffset += height + 40;
-
-    if (yOffset > maxColumnHeight) {
-      yOffset = yOffsetStart;
-      xOffset += layerGapX;
-      yOffset = 60;
-      xOffset += layerGapX;
-    }
-  }
-
-  return positions;
-}
 
 export interface MeshPageProps {
-  readonly onStateChange?: (
-    state: LatticeState,
-    expressions: ReadonlyMap<string, string>,
-    typeErrors: ReadonlyMap<string, string>,
-  ) => void;
+  readonly latticeState: LatticeState;
+  readonly expressions: ReadonlyMap<string, string>;
+  readonly nodePositions: ReadonlyMap<string, Point>;
+  readonly selectedNodeId: string | null;
+  readonly selectedEdgeId: string | null;
+  readonly editingNodeId: string | null;
+  readonly executionState: ExecutionState;
+  readonly executionResult: GraphExecutionResult | null;
+  readonly typeStatus: ReadonlyMap<string, 'unchecked' | 'valid' | 'invalid'>;
+  readonly typeErrors: ReadonlyMap<string, string>;
+  readonly graphValidation: GraphValidation | null;
+  readonly isBlocking: boolean;
+  readonly errorMessage: string;
+  readonly onNodeMove: (nodeId: string, newPosition: Point) => void;
+  readonly onNodeSelect: (nodeId: string | null) => void;
+  readonly onNodeDoubleClick: (nodeId: string) => void;
+  readonly onExpressionCommit: (nodeId: string, expression: string) => void;
+  readonly onExpressionCancel: () => void;
+  readonly onConnectionCreate: (fromNodeId: string, fromPort: string, toNodeId: string, toPort: string) => void;
+  readonly onConnectionValidationError?: (fromType: PortType, toType: PortType) => void;
+  readonly onEdgeSelect: (edgeId: string | null) => void;
+  readonly onDeleteSelected: () => void;
+  readonly onDeselect: () => void;
 }
 
-const STATUS_BAR_COLORS: Record<ExecutionStatus, string> = {
-  idle: '#555555',
-  running: '#22c55e',
-  blocked: '#ef4444',
-  stopped: '#f59e0b',
-};
+export default function MeshPage({
+  latticeState,
+  expressions,
+  nodePositions,
+  selectedNodeId,
+  selectedEdgeId,
+  editingNodeId,
+  executionState,
+  typeStatus,
+  typeErrors,
+  graphValidation,
+  isBlocking,
+  onNodeMove,
+  onNodeSelect,
+  onNodeDoubleClick,
+  onExpressionCommit,
+  onExpressionCancel,
+  onConnectionCreate,
+  onConnectionValidationError,
+  onEdgeSelect,
+}: MeshPageProps): React.ReactElement {
+  const view = useMeshProjection(latticeState, expressions, typeStatus, typeErrors);
 
-const STATUS_BAR_LABELS: Record<ExecutionStatus, string> = {
-  idle: 'IDLE',
-  running: 'RUNNING',
-  blocked: 'BLOCKED',
-  stopped: 'STOPPED',
-};
+  const existingConnections = useMemo(
+    () =>
+      latticeState.connections.map((c) => ({
+        from: c.from as string,
+        to: c.to as string,
+        fromPort: c.fromPort,
+        toPort: c.toPort,
+      })),
+    [latticeState.connections],
+  );
 
-export default function MeshPage({ onStateChange }: MeshPageProps): React.ReactElement {
-  const [state, setState] = useState(() => createEmptyLatticeState());
-  const [expressions, setExpressions] = useState<Map<string, string>>(new Map());
-  const [nodeTypeStatus, setNodeTypeStatus] = useState<Map<string, 'unchecked' | 'valid' | 'invalid'>>(new Map());
-  const [nodeTypeErrors, setNodeTypeErrors] = useState<Map<string, string>>(new Map());
-  const kindCounters = useRef<Map<LatticeNodeKind, number>>(new Map());
-
-  const view = useMeshProjection(state, expressions, nodeTypeStatus, nodeTypeErrors);
-
-  const [nodePositions, setNodePositions] = useState<Map<string, Point>>(
-    () => {
-      const positions = extractInitialPositions(state);
-      for (const node of view.nodes) {
-        if (!positions.has(node.id)) {
-          positions.set(node.id, { x: node.rect.x, y: node.rect.y });
+  const errorNodeIds = useMemo((): ReadonlySet<string> => {
+    const ids = new Set<string>();
+    if (graphValidation !== null) {
+      for (let i = 0; i < graphValidation.errors.length; i++) {
+        const err = graphValidation.errors[i]!;
+        if (err.nodeId !== undefined) {
+          ids.add(err.nodeId);
         }
       }
-      return positions;
-    },
-  );
+    }
+    return ids;
+  }, [graphValidation]);
 
-  const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
-  const [selectedEdgeId, setSelectedEdgeId] = useState<string | null>(null);
-  const [editingNodeId, setEditingNodeId] = useState<string | null>(null);
-  const [executionStatus, setExecutionStatus] = useState<ExecutionStatus>('idle');
-  const [errorMessage, setErrorMessage] = useState<string>('');
-  const [showAddMenu, setShowAddMenu] = useState<boolean>(false);
-
-  const typeCheckGuard = useTypeCheckGuard();
-
-  const applyDiagnostics = useCallback(
-    (diagnostics: ReadonlyMap<string, TypeCheckDiagnostic>): void => {
-      const newStatus = new Map<string, 'unchecked' | 'valid' | 'invalid'>();
-      const newErrors = new Map<string, string>();
-
-      for (const [nodeId, diag] of diagnostics) {
-        if (diag.source.trim().length === 0) {
-          newStatus.set(nodeId, 'unchecked');
-        } else if (diag.isValid) {
-          newStatus.set(nodeId, 'valid');
-        } else {
-          newStatus.set(nodeId, 'invalid');
-          newErrors.set(nodeId, diag.error);
+  const errorEdgeIds = useMemo((): ReadonlySet<string> => {
+    const ids = new Set<string>();
+    if (graphValidation !== null) {
+      for (let i = 0; i < graphValidation.errors.length; i++) {
+        const err = graphValidation.errors[i]!;
+        if (err.connectionId !== undefined) {
+          ids.add(err.connectionId);
         }
       }
-
-      setNodeTypeStatus(newStatus);
-      setNodeTypeErrors(newErrors);
-    },
-    [],
-  );
-
-  const stateVersionRef = useRef(state.version);
-  useEffect(() => {
-    if (state.version !== stateVersionRef.current) {
-      stateVersionRef.current = state.version;
     }
-    onStateChange?.(state, expressions, nodeTypeErrors);
-  }, [state, expressions, nodeTypeErrors, onStateChange]);
+    return ids;
+  }, [graphValidation]);
 
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent): void => {
-      const tag = (e.target as HTMLElement)?.tagName;
-      if (tag === 'TEXTAREA' || tag === 'INPUT') return;
-
-      if (e.key === 'Delete' || e.key === 'Backspace') {
-        e.preventDefault();
-        if (selectedNodeId !== null) {
-          setNodePositions((prev) => {
-            const next = new Map(prev);
-            next.delete(selectedNodeId);
-            return next;
-          });
-          setExpressions((prev) => {
-            const next = new Map(prev);
-            next.delete(selectedNodeId);
-            return next;
-          });
-          setNodeTypeStatus((prev) => {
-            const next = new Map(prev);
-            next.delete(selectedNodeId);
-            return next;
-          });
-          setNodeTypeErrors((prev) => {
-            const next = new Map(prev);
-            next.delete(selectedNodeId);
-            return next;
-          });
-          setState((prev) => {
-            const nextNodes = new Map(prev.nodes);
-            nextNodes.delete(selectedNodeId as LatticeNodeId);
-            const nextConnections = prev.connections.filter(
-              (c) => c.from !== selectedNodeId && c.to !== selectedNodeId,
-            );
-            return { ...prev, nodes: nextNodes, connections: nextConnections, version: prev.version + 1 };
-          });
-          setSelectedNodeId(null);
-          setEditingNodeId(null);
-        } else if (selectedEdgeId !== null) {
-          setState((prev) => ({
-            ...prev,
-            connections: prev.connections.filter((c) => c.id !== selectedEdgeId),
-            version: prev.version + 1,
-          }));
-          setSelectedEdgeId(null);
+  const executingNodeIds = useMemo((): ReadonlySet<string> => {
+    const ids = new Set<string>();
+    if (executionState.mode === 'running' || executionState.mode === 'stepping') {
+      for (let i = 0; i < executionState.executionPlan.length; i++) {
+        const step = executionState.executionPlan[i]!;
+        if (step.status === 'running') {
+          ids.add(step.nodeId);
         }
       }
-
-      if (e.key === 'Escape') {
-        setSelectedNodeId(null);
-        setSelectedEdgeId(null);
-        setEditingNodeId(null);
-        setShowAddMenu(false);
-      }
-    };
-
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [selectedNodeId, selectedEdgeId]);
-
-  const handleNodeMove = useCallback(
-    (nodeId: string, newPosition: Point): void => {
-      setNodePositions((prev) => {
-        const next = new Map(prev);
-        next.set(nodeId, newPosition);
-        return next;
-      });
-    },
-    [],
-  );
-
-  const handleNodeSelect = useCallback((nodeId: string | null): void => {
-    setSelectedNodeId(nodeId);
-    if (nodeId !== null) {
-      setSelectedEdgeId(null);
     }
-  }, []);
+    return ids;
+  }, [executionState]);
 
-  const handleNodeDoubleClick = useCallback((nodeId: string): void => {
-    setEditingNodeId(nodeId);
-  }, []);
-
-  const handleAddNode = useCallback(
-    (kind: LatticeNodeKind): void => {
-      const currentCount = kindCounters.current.get(kind) ?? 0;
-      const nextCount = currentCount + 1;
-      kindCounters.current.set(kind, nextCount);
-      const id = createLatticeNodeId(`${kind}-${nextCount}-${Date.now()}`);
-      const schema = getSchemaForKind(kind);
-      const newNode: LatticeNode = {
-        id,
-        kind,
-        schema,
-      };
-
-      const x = 200 + Math.random() * 100;
-      const y = 100 + Math.random() * 100;
-
-      setNodePositions((prev) => {
-        const next = new Map(prev);
-        next.set(id as string, { x, y });
-        return next;
-      });
-
-      setState((prev) => {
-        const nextNodes = new Map(prev.nodes);
-        nextNodes.set(id, newNode);
-        return { ...prev, nodes: nextNodes, version: prev.version + 1 };
-      });
-    },
-    [],
-  );
-
-  const handleDeleteNode = useCallback((): void => {
-    if (selectedNodeId === null) return;
-    setNodePositions((prev) => {
-      const next = new Map(prev);
-      next.delete(selectedNodeId);
-      return next;
-    });
-    setExpressions((prev) => {
-      const next = new Map(prev);
-      next.delete(selectedNodeId);
-      return next;
-    });
-    setNodeTypeStatus((prev) => {
-      const next = new Map(prev);
-      next.delete(selectedNodeId);
-      return next;
-    });
-    setNodeTypeErrors((prev) => {
-      const next = new Map(prev);
-      next.delete(selectedNodeId);
-      return next;
-    });
-    setState((prev) => {
-      const nextNodes = new Map(prev.nodes);
-      nextNodes.delete(selectedNodeId as LatticeNodeId);
-      const nextConnections = prev.connections.filter(
-        (c) => c.from !== selectedNodeId && c.to !== selectedNodeId,
-      );
-      return { ...prev, nodes: nextNodes, connections: nextConnections, version: prev.version + 1 };
-    });
-    setSelectedNodeId(null);
-    setEditingNodeId(null);
-  }, [selectedNodeId]);
-
-  const handleConnectionValidationError = useCallback(
-    (fromType: PortType, toType: PortType): void => {
-      setErrorMessage(`Type mismatch: cannot connect ${fromType} output to ${toType} input`);
-    },
-    [],
-  );
-
-  const handleConnectionCreate = useCallback(
-    (fromNodeId: string, fromPort: string, toNodeId: string, toPort: string): void => {
-      const connId = `conn-${Date.now()}`;
-      const newConn: LatticeConnection = {
-        id: connId,
-        from: createLatticeNodeId(fromNodeId),
-        to: createLatticeNodeId(toNodeId),
-        fromPort,
-        toPort,
-      };
-      setState((prev) => ({
-        ...prev,
-        connections: [...prev.connections, newConn],
-        version: prev.version + 1,
-      }));
-      setErrorMessage('');
-    },
-    [],
-  );
-
-  const handleEdgeSelect = useCallback((edgeId: string | null): void => {
-    setSelectedEdgeId(edgeId);
-    if (edgeId !== null) {
-      setSelectedNodeId(null);
-    }
-  }, []);
-
-  const handleDeleteConnection = useCallback((): void => {
-    if (selectedEdgeId === null) return;
-    setState((prev) => ({
-      ...prev,
-      connections: prev.connections.filter((c) => c.id !== selectedEdgeId),
-      version: prev.version + 1,
-    }));
-    setSelectedEdgeId(null);
-  }, [selectedEdgeId]);
-
-  const handleExpressionCommit = useCallback(
-    (nodeId: string, expression: string): void => {
-      setExpressions((prev) => {
-        const next = new Map(prev);
-        next.set(nodeId, expression);
-        return next;
-      });
-
-      if (expression.trim().length === 0) {
-        setNodeTypeStatus((prev) => {
-          const next = new Map(prev);
-          next.set(nodeId, 'unchecked');
-          return next;
-        });
-        setNodeTypeErrors((prev) => {
-          const next = new Map(prev);
-          next.delete(nodeId);
-          return next;
-        });
-      } else {
-        const result = parseAndTypeCheck(expression);
-        if (result.ok) {
-          setNodeTypeStatus((prev) => {
-            const next = new Map(prev);
-            next.set(nodeId, 'valid');
-            return next;
-          });
-          setNodeTypeErrors((prev) => {
-            const next = new Map(prev);
-            next.delete(nodeId);
-            return next;
-          });
-        } else {
-          setNodeTypeStatus((prev) => {
-            const next = new Map(prev);
-            next.set(nodeId, 'invalid');
-            return next;
-          });
-          setNodeTypeErrors((prev) => {
-            const next = new Map(prev);
-            next.set(nodeId, result.error.message);
-            return next;
-          });
+  const completedNodeIds = useMemo((): ReadonlySet<string> => {
+    const ids = new Set<string>();
+    if (executionState.mode !== 'stopped' || executionState.executionPlan.length > 0) {
+      for (let i = 0; i < executionState.executionPlan.length; i++) {
+        const step = executionState.executionPlan[i]!;
+        if (step.status === 'complete') {
+          ids.add(step.nodeId);
         }
       }
-
-      setEditingNodeId(null);
-    },
-    [],
-  );
-
-  const handleExpressionCancel = useCallback((): void => {
-    setEditingNodeId(null);
-  }, []);
-
-  const handleRun = useCallback((): void => {
-    const { diagnostics: runDiagnostics, canExecute } = typeCheckGuard.runTypeCheck(expressions);
-    applyDiagnostics(runDiagnostics);
-
-    if (!canExecute) {
-      setExecutionStatus('blocked');
-      setErrorMessage('Execution blocked: type check errors detected');
-      return;
     }
+    return ids;
+  }, [executionState]);
 
-    setExecutionStatus('running');
-    setErrorMessage('');
-  }, [expressions, typeCheckGuard, applyDiagnostics]);
+  const errorExecutionNodeIds = useMemo((): ReadonlySet<string> => {
+    const ids = new Set<string>();
+    for (let i = 0; i < executionState.executionPlan.length; i++) {
+      const step = executionState.executionPlan[i]!;
+      if (step.status === 'error') {
+        ids.add(step.nodeId);
+      }
+    }
+    return ids;
+  }, [executionState]);
 
-  const handleStop = useCallback((): void => {
-    setExecutionStatus('stopped');
-    setErrorMessage('');
-    typeCheckGuard.clearBlock();
-  }, [typeCheckGuard]);
-
-  const handleDismissError = useCallback((): void => {
-    setErrorMessage('');
-  }, []);
-
-  const statusBarColor = STATUS_BAR_COLORS[executionStatus];
-  const statusBarLabel = STATUS_BAR_LABELS[executionStatus];
+  const isEmpty = latticeState.nodes.size === 0;
 
   return (
-    <div style={{
-      width: '100vw',
-      height: '100vh',
-      display: 'flex',
-      flexDirection: 'column',
-      backgroundColor: '#08080f',
-      overflow: 'hidden',
-    }}>
-      <div style={{
-        display: 'flex',
-        alignItems: 'center',
-        gap: '12px',
-        padding: '8px 16px',
-        backgroundColor: '#0c0c14',
-        borderBottom: '1px solid #1a1a2e',
-        fontFamily: 'monospace',
-        fontSize: '12px',
-        color: '#888888',
-        zIndex: 10,
-        flexShrink: 0,
-      }}>
-        <span style={{ color: '#4a9eff', fontWeight: 'bold' }}>MONOLITH</span>
-        <span style={{ color: '#555555' }}>|</span>
-        <span>MESH</span>
-        <span style={{ color: '#555555' }}>|</span>
-        <div style={{ position: 'relative' }}>
-          <span
-            style={{ cursor: 'pointer', color: '#aaaaaa' }}
-            onClick={() => setShowAddMenu(!showAddMenu)}
-          >+ Add Node ▾</span>
-          <div
-            onMouseLeave={() => setShowAddMenu(false)}
-            style={{
-              position: 'absolute',
-              top: '100%',
-              left: 0,
-              display: showAddMenu ? 'block' : 'none',
-              backgroundColor: '#14141f',
-              border: '1px solid #2a2a3e',
-              borderRadius: '4px',
-              padding: '4px 0',
-              zIndex: 100,
-            }}
-          >
-            {ALL_KINDS.map((kind) => (
-              <div
-                key={kind}
-                style={{
-                  padding: '4px 12px',
-                  cursor: 'pointer',
-                  color: '#cccccc',
-                }}
-                onClick={() => {
-                  handleAddNode(kind);
-                  setShowAddMenu(false);
-                }}
-              >
-                {kind}
-              </div>
-            ))}
-          </div>
-        </div>
-        {selectedNodeId !== null && (
-          <span
-            style={{ cursor: 'pointer', color: '#ef4444' }}
-            onClick={handleDeleteNode}
-          >
-            ✕ Delete
-          </span>
-        )}
-        {selectedEdgeId !== null && (
-          <span
-            style={{ cursor: 'pointer', color: '#f59e0b' }}
-            onClick={handleDeleteConnection}
-          >
-            ✕ Delete Wire
-          </span>
-        )}
-        <span style={{ color: '#555555' }}>|</span>
-        {executionStatus === 'running' ? (
-          <span
-            style={{
-              cursor: 'pointer',
-              color: '#f59e0b',
-              fontWeight: 'bold',
-              padding: '2px 10px',
-              border: '1px solid #f59e0b',
-              borderRadius: '3px',
-            }}
-            onClick={handleStop}
-          >
-            ■ STOP
-          </span>
-        ) : (
-          <span
-            style={{
-              cursor: 'pointer',
-              color: executionStatus === 'blocked' ? '#ef4444' : '#22c55e',
-              fontWeight: 'bold',
-              padding: '2px 10px',
-              border: `1px solid ${executionStatus === 'blocked' ? '#ef4444' : '#22c55e'}`,
-              borderRadius: '3px',
-            }}
-            onClick={handleRun}
-          >
-            ▶ RUN
-          </span>
-        )}
-        <span style={{ marginLeft: 'auto', color: '#555555' }}>
-          {view.nodes.length} nodes · {view.edges.length} edges · {state.connections.length} connections
-        </span>
-      </div>
-      {errorMessage.length > 0 && (
+    <div style={{ width: '100%', height: '100%', position: 'relative' }}>
+      <MeshCanvas
+        view={view}
+        selectedNodeId={selectedNodeId}
+        selectedEdgeId={selectedEdgeId}
+        editingNodeId={editingNodeId}
+        nodePositions={nodePositions}
+        isBlocking={isBlocking}
+        errorNodeIds={errorNodeIds}
+        errorEdgeIds={errorEdgeIds}
+        executingNodeIds={executingNodeIds}
+        completedNodeIds={completedNodeIds}
+        errorExecutionNodeIds={errorExecutionNodeIds}
+        onNodeMove={onNodeMove}
+        onNodeSelect={onNodeSelect}
+        onNodeDoubleClick={onNodeDoubleClick}
+        onExpressionCommit={onExpressionCommit}
+        onExpressionCancel={onExpressionCancel}
+        onConnectionCreate={onConnectionCreate}
+        onConnectionValidationError={onConnectionValidationError}
+        onEdgeSelect={onEdgeSelect}
+        existingConnections={existingConnections}
+      />
+      {isEmpty && (
         <div style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: '8px',
-          padding: '6px 16px',
-          backgroundColor: '#1a0a0a',
-          borderBottom: '1px solid #3a1515',
+          position: 'absolute',
+          top: '50%',
+          left: '50%',
+          transform: 'translate(-50%, -50%)',
+          color: '#555555',
+          fontSize: '14px',
           fontFamily: 'monospace',
-          fontSize: '11px',
-          color: '#ef4444',
-          flexShrink: 0,
+          textAlign: 'center',
+          pointerEvents: 'none',
+          zIndex: 5,
         }}>
-          <span>⚠</span>
-          <span style={{ flex: 1 }}>{errorMessage}</span>
-          <span
-            style={{ cursor: 'pointer', color: '#888888' }}
-            onClick={handleDismissError}
-          >
-            ✕
-          </span>
+          Add your first node using the palette (Space)
         </div>
       )}
-      <div style={{ flex: 1, position: 'relative' }}>
-        <MeshCanvas
-          view={view}
-          selectedNodeId={selectedNodeId}
-          selectedEdgeId={selectedEdgeId}
-          editingNodeId={editingNodeId}
-          nodePositions={nodePositions}
-          isBlocking={typeCheckGuard.isBlocking}
-          onNodeMove={handleNodeMove}
-          onNodeSelect={handleNodeSelect}
-          onNodeDoubleClick={handleNodeDoubleClick}
-          onExpressionCommit={handleExpressionCommit}
-          onExpressionCancel={handleExpressionCancel}
-          onConnectionCreate={handleConnectionCreate}
-          onConnectionValidationError={handleConnectionValidationError}
-          onEdgeSelect={handleEdgeSelect}
-          existingConnections={state.connections.map((c) => ({
-            from: c.from as string,
-            to: c.to as string,
-            fromPort: c.fromPort,
-            toPort: c.toPort,
-          }))}
-        />
-      </div>
-      <div style={{
-        display: 'flex',
-        alignItems: 'center',
-        gap: '8px',
-        padding: '4px 16px',
-        backgroundColor: '#0c0c14',
-        borderTop: '1px solid #1a1a2e',
-        fontFamily: 'monospace',
-        fontSize: '10px',
-        color: '#888888',
-        flexShrink: 0,
-      }}>
-        <div style={{
-          width: '8px',
-          height: '8px',
-          borderRadius: '50%',
-          backgroundColor: statusBarColor,
-          boxShadow: executionStatus === 'running'
-            ? '0 0 6px #22c55e'
-            : executionStatus === 'blocked'
-              ? '0 0 6px #ef4444'
-              : 'none',
-        }} />
-        <span style={{ color: statusBarColor, fontWeight: 'bold' }}>{statusBarLabel}</span>
-        <span style={{ color: '#555555' }}>|</span>
-        <span>{expressions.size} expressions</span>
-        {typeCheckGuard.isBlocking && (
-          <>
-            <span style={{ color: '#555555' }}>|</span>
-            <span style={{ color: '#ef4444' }}>
-              {typeCheckGuard.diagnostics.size} checked · {Array.from(typeCheckGuard.diagnostics.values()).filter((d) => !d.isValid).length} errors
-            </span>
-          </>
-        )}
-      </div>
     </div>
   );
 }
