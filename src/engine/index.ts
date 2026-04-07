@@ -25,4 +25,5 @@ export {
   getNodeTypeDefinition,
   getAllCategories,
   getNodesByCategory,
+  searchNodes,
 } from './registry';

@@ -1,5 +1,6 @@
 import type { LawResult } from '@law/types';
 import type { NodeTypeDefinition, NodeCategory, PortDefinition } from './types';
+import { ALL_NODE_DEFINITIONS } from './nodes';
 
 const SOURCE_DEFINITION: NodeTypeDefinition = {
   kind: 'source',
@@ -84,13 +85,18 @@ const SPLIT_DEFINITION: NodeTypeDefinition = {
   editableSchema: false,
 };
 
-const BUILT_IN_DEFINITIONS: ReadonlyArray<NodeTypeDefinition> = [
+const ORIGINAL_DEFINITIONS: ReadonlyArray<NodeTypeDefinition> = [
   SOURCE_DEFINITION,
   TRANSFORM_DEFINITION,
   SINK_DEFINITION,
   GATE_DEFINITION,
   MERGE_DEFINITION,
   SPLIT_DEFINITION,
+];
+
+const ALL_DEFINITIONS: ReadonlyArray<NodeTypeDefinition> = [
+  ...ORIGINAL_DEFINITIONS,
+  ...ALL_NODE_DEFINITIONS,
 ];
 
 function buildRegistry(
@@ -105,7 +111,7 @@ function buildRegistry(
 }
 
 export const NODE_REGISTRY: ReadonlyMap<string, NodeTypeDefinition> =
-  buildRegistry(BUILT_IN_DEFINITIONS);
+  buildRegistry(ALL_DEFINITIONS);
 
 export function getNodeTypeDefinition(kind: string): LawResult<NodeTypeDefinition> {
   const definition = NODE_REGISTRY.get(kind);
@@ -137,4 +143,66 @@ export function getNodesByCategory(category: NodeCategory): ReadonlyArray<NodeTy
     }
   }
   return result;
+}
+
+function normalizeQuery(query: string): string {
+  return query.toLowerCase().replace(/[-\s]+/g, ' ').trim();
+}
+
+function scoreMatch(definition: NodeTypeDefinition, normalizedQuery: string): number {
+  const fields = [
+    definition.kind,
+    definition.label,
+    definition.description,
+    definition.category,
+  ];
+  let bestScore = 0;
+  for (let i = 0; i < fields.length; i++) {
+    const field = fields[i]!.toLowerCase();
+    if (field === normalizedQuery) {
+      return 100;
+    }
+    if (field.startsWith(normalizedQuery)) {
+      const score = 80 - i * 5;
+      if (score > bestScore) {
+        bestScore = score;
+      }
+    }
+    if (field.includes(normalizedQuery)) {
+      const score = 60 - i * 5;
+      if (score > bestScore) {
+        bestScore = score;
+      }
+    }
+  }
+  const queryWords = normalizedQuery.split(' ');
+  for (let i = 0; i < fields.length; i++) {
+    const field = fields[i]!.toLowerCase();
+    for (let j = 0; j < queryWords.length; j++) {
+      const word = queryWords[j]!;
+      if (word.length > 0 && field.includes(word)) {
+        const score = 40 - i * 3;
+        if (score > bestScore) {
+          bestScore = score;
+        }
+      }
+    }
+  }
+  return bestScore;
+}
+
+export function searchNodes(query: string): ReadonlyArray<NodeTypeDefinition> {
+  const normalizedQuery = normalizeQuery(query);
+  if (normalizedQuery.length === 0) {
+    return Array.from(NODE_REGISTRY.values());
+  }
+  const scored: ReadonlyArray<{ readonly definition: NodeTypeDefinition; readonly score: number }> =
+    ALL_DEFINITIONS.map((def) => ({
+      definition: def,
+      score: scoreMatch(def, normalizedQuery),
+    }));
+  return scored
+    .filter((entry) => entry.score > 0)
+    .sort((a, b) => b.score - a.score)
+    .map((entry) => entry.definition);
 }
