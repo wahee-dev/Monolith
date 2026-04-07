@@ -1,12 +1,17 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { createLatticeNodeId } from '@lattice/types';
 import type { LatticeState, LatticeNode, LatticeNodeId, LatticeNodeKind } from '@lattice/types';
 import type { Point } from '@mesh/types';
+import { parseAndTypeCheck } from '@lattice/expression';
 import { MeshCanvas, useMeshProjection } from '@mesh/index';
+import { useTypeCheckGuard } from '@mesh/hooks/useTypeCheckGuard';
+import type { TypeCheckDiagnostic } from '@law/typecheck';
 
 const ALL_KINDS: ReadonlyArray<LatticeNodeKind> = ['source', 'transform', 'sink', 'gate', 'merge', 'split'];
+
+type ExecutionStatus = 'idle' | 'running' | 'blocked' | 'stopped';
 
 function createSampleLatticeState(): LatticeState {
   const sourceId = createLatticeNodeId('node-source-001');
@@ -156,9 +161,27 @@ export interface MeshPageProps {
   ) => void;
 }
 
+const STATUS_BAR_COLORS: Record<ExecutionStatus, string> = {
+  idle: '#555555',
+  running: '#22c55e',
+  blocked: '#ef4444',
+  stopped: '#f59e0b',
+};
+
+const STATUS_BAR_LABELS: Record<ExecutionStatus, string> = {
+  idle: 'IDLE',
+  running: 'RUNNING',
+  blocked: 'BLOCKED',
+  stopped: 'STOPPED',
+};
+
 export default function MeshPage({ onStateChange }: MeshPageProps): React.ReactElement {
   const [state] = useState(() => createSampleLatticeState());
-  const view = useMeshProjection(state);
+  const [expressions, setExpressions] = useState<Map<string, string>>(new Map());
+  const [nodeTypeStatus, setNodeTypeStatus] = useState<Map<string, 'unchecked' | 'valid' | 'invalid'>>(new Map());
+  const [nodeTypeErrors, setNodeTypeErrors] = useState<Map<string, string>>(new Map());
+
+  const view = useMeshProjection(state, expressions, nodeTypeStatus, nodeTypeErrors);
 
   const [nodePositions, setNodePositions] = useState<Map<string, Point>>(
     () => {
@@ -174,19 +197,32 @@ export default function MeshPage({ onStateChange }: MeshPageProps): React.ReactE
 
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
   const [editingNodeId, setEditingNodeId] = useState<string | null>(null);
-  const [expressions, setExpressions] = useState<Map<string, string>>(new Map());
-  const [nodeTypeStatus, setNodeTypeStatus] = useState<Map<string, 'unchecked' | 'valid' | 'invalid'>>(new Map());
-  const [nodeTypeErrors, setNodeTypeErrors] = useState<Map<string, string>>(new Map());
+  const [executionStatus, setExecutionStatus] = useState<ExecutionStatus>('idle');
+  const [errorMessage, setErrorMessage] = useState<string>('');
 
-  const enhancedView = useMemo(() => {
-    const nodes = view.nodes.map((node) => ({
-      ...node,
-      expression: expressions.get(node.id) ?? '',
-      typeStatus: nodeTypeStatus.get(node.id) ?? 'unchecked' as const,
-      typeError: nodeTypeErrors.get(node.id) ?? '',
-    }));
-    return { ...view, nodes };
-  }, [view, expressions, nodeTypeStatus, nodeTypeErrors]);
+  const typeCheckGuard = useTypeCheckGuard();
+
+  const applyDiagnostics = useCallback(
+    (diagnostics: ReadonlyMap<string, TypeCheckDiagnostic>): void => {
+      const newStatus = new Map<string, 'unchecked' | 'valid' | 'invalid'>();
+      const newErrors = new Map<string, string>();
+
+      for (const [nodeId, diag] of diagnostics) {
+        if (diag.source.trim().length === 0) {
+          newStatus.set(nodeId, 'unchecked');
+        } else if (diag.isValid) {
+          newStatus.set(nodeId, 'valid');
+        } else {
+          newStatus.set(nodeId, 'invalid');
+          newErrors.set(nodeId, diag.error);
+        }
+      }
+
+      setNodeTypeStatus(newStatus);
+      setNodeTypeErrors(newErrors);
+    },
+    [],
+  );
 
   useEffect(() => {
     onStateChange?.(state, expressions, nodeTypeErrors);
@@ -265,6 +301,88 @@ export default function MeshPage({ onStateChange }: MeshPageProps): React.ReactE
     setEditingNodeId(null);
   }, [selectedNodeId]);
 
+  const handleExpressionCommit = useCallback(
+    (nodeId: string, expression: string): void => {
+      setExpressions((prev) => {
+        const next = new Map(prev);
+        next.set(nodeId, expression);
+        return next;
+      });
+
+      if (expression.trim().length === 0) {
+        setNodeTypeStatus((prev) => {
+          const next = new Map(prev);
+          next.set(nodeId, 'unchecked');
+          return next;
+        });
+        setNodeTypeErrors((prev) => {
+          const next = new Map(prev);
+          next.delete(nodeId);
+          return next;
+        });
+      } else {
+        const result = parseAndTypeCheck(expression);
+        if (result.ok) {
+          setNodeTypeStatus((prev) => {
+            const next = new Map(prev);
+            next.set(nodeId, 'valid');
+            return next;
+          });
+          setNodeTypeErrors((prev) => {
+            const next = new Map(prev);
+            next.delete(nodeId);
+            return next;
+          });
+        } else {
+          setNodeTypeStatus((prev) => {
+            const next = new Map(prev);
+            next.set(nodeId, 'invalid');
+            return next;
+          });
+          setNodeTypeErrors((prev) => {
+            const next = new Map(prev);
+            next.set(nodeId, result.error.message);
+            return next;
+          });
+        }
+      }
+
+      setEditingNodeId(null);
+    },
+    [],
+  );
+
+  const handleExpressionCancel = useCallback((): void => {
+    setEditingNodeId(null);
+  }, []);
+
+  const handleRun = useCallback((): void => {
+    const { diagnostics: runDiagnostics, canExecute } = typeCheckGuard.runTypeCheck(expressions);
+    applyDiagnostics(runDiagnostics);
+
+    if (!canExecute) {
+      setExecutionStatus('blocked');
+      setErrorMessage('Execution blocked: type check errors detected');
+      return;
+    }
+
+    setExecutionStatus('running');
+    setErrorMessage('');
+  }, [expressions, typeCheckGuard, applyDiagnostics]);
+
+  const handleStop = useCallback((): void => {
+    setExecutionStatus('stopped');
+    setErrorMessage('');
+    typeCheckGuard.clearBlock();
+  }, [typeCheckGuard]);
+
+  const handleDismissError = useCallback((): void => {
+    setErrorMessage('');
+  }, []);
+
+  const statusBarColor = STATUS_BAR_COLORS[executionStatus];
+  const statusBarLabel = STATUS_BAR_LABELS[executionStatus];
+
   return (
     <div style={{
       width: '100vw',
@@ -327,20 +445,111 @@ export default function MeshPage({ onStateChange }: MeshPageProps): React.ReactE
             ✕ Delete
           </span>
         )}
+        <span style={{ color: '#555555' }}>|</span>
+        {executionStatus === 'running' ? (
+          <span
+            style={{
+              cursor: 'pointer',
+              color: '#f59e0b',
+              fontWeight: 'bold',
+              padding: '2px 10px',
+              border: '1px solid #f59e0b',
+              borderRadius: '3px',
+            }}
+            onClick={handleStop}
+          >
+            ■ STOP
+          </span>
+        ) : (
+          <span
+            style={{
+              cursor: 'pointer',
+              color: executionStatus === 'blocked' ? '#ef4444' : '#22c55e',
+              fontWeight: 'bold',
+              padding: '2px 10px',
+              border: `1px solid ${executionStatus === 'blocked' ? '#ef4444' : '#22c55e'}`,
+              borderRadius: '3px',
+            }}
+            onClick={handleRun}
+          >
+            ▶ RUN
+          </span>
+        )}
         <span style={{ marginLeft: 'auto', color: '#555555' }}>
-          {enhancedView.nodes.length} nodes · {enhancedView.edges.length} edges
+          {view.nodes.length} nodes · {view.edges.length} edges
         </span>
       </div>
+      {errorMessage.length > 0 && (
+        <div style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: '8px',
+          padding: '6px 16px',
+          backgroundColor: '#1a0a0a',
+          borderBottom: '1px solid #3a1515',
+          fontFamily: 'monospace',
+          fontSize: '11px',
+          color: '#ef4444',
+          flexShrink: 0,
+        }}>
+          <span>⚠</span>
+          <span style={{ flex: 1 }}>{errorMessage}</span>
+          <span
+            style={{ cursor: 'pointer', color: '#888888' }}
+            onClick={handleDismissError}
+          >
+            ✕
+          </span>
+        </div>
+      )}
       <div style={{ flex: 1, position: 'relative' }}>
         <MeshCanvas
-          view={enhancedView}
+          view={view}
           selectedNodeId={selectedNodeId}
           editingNodeId={editingNodeId}
           nodePositions={nodePositions}
+          isBlocking={typeCheckGuard.isBlocking}
           onNodeMove={handleNodeMove}
           onNodeSelect={handleNodeSelect}
           onNodeDoubleClick={handleNodeDoubleClick}
+          onExpressionCommit={handleExpressionCommit}
+          onExpressionCancel={handleExpressionCancel}
         />
+      </div>
+      <div style={{
+        display: 'flex',
+        alignItems: 'center',
+        gap: '8px',
+        padding: '4px 16px',
+        backgroundColor: '#0c0c14',
+        borderTop: '1px solid #1a1a2e',
+        fontFamily: 'monospace',
+        fontSize: '10px',
+        color: '#888888',
+        flexShrink: 0,
+      }}>
+        <div style={{
+          width: '8px',
+          height: '8px',
+          borderRadius: '50%',
+          backgroundColor: statusBarColor,
+          boxShadow: executionStatus === 'running'
+            ? '0 0 6px #22c55e'
+            : executionStatus === 'blocked'
+              ? '0 0 6px #ef4444'
+              : 'none',
+        }} />
+        <span style={{ color: statusBarColor, fontWeight: 'bold' }}>{statusBarLabel}</span>
+        <span style={{ color: '#555555' }}>|</span>
+        <span>{expressions.size} expressions</span>
+        {typeCheckGuard.isBlocking && (
+          <>
+            <span style={{ color: '#555555' }}>|</span>
+            <span style={{ color: '#ef4444' }}>
+              {typeCheckGuard.diagnostics.size} checked · {Array.from(typeCheckGuard.diagnostics.values()).filter((d) => !d.isValid).length} errors
+            </span>
+          </>
+        )}
       </div>
     </div>
   );

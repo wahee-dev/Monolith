@@ -1,6 +1,6 @@
 import type { LatticeState, LatticeNode } from '@lattice/types';
 import type { LawResult } from '@law/types';
-import type { NodeView, EdgeView, MeshView, FieldView } from './types';
+import type { NodeView, EdgeView, MeshView, FieldView, TypeStatus } from './types';
 import { computeLayout } from './layout';
 import { computeBezierPath, computeBounds } from './geometry';
 import { renderStringField } from './renderers/string';
@@ -82,6 +82,9 @@ function buildNodeFields(
 function buildNodeViews(
   state: LatticeState,
   layoutMap: ReadonlyMap<string, { readonly x: number; readonly y: number; readonly width: number; readonly height: number }>,
+  expressions: ReadonlyMap<string, string>,
+  typeStatusMap: ReadonlyMap<string, TypeStatus>,
+  typeErrors: ReadonlyMap<string, string>,
 ): ReadonlyArray<NodeView> {
   const views: NodeView[] = [];
   const nodeEntries = Array.from(state.nodes.entries()).sort(
@@ -90,7 +93,8 @@ function buildNodeViews(
 
   for (let i = 0; i < nodeEntries.length; i++) {
     const [nodeId, node] = nodeEntries[i]!;
-    const rect = layoutMap.get(nodeId as string);
+    const id = nodeId as string;
+    const rect = layoutMap.get(id);
     if (rect === undefined) continue;
 
     const nodeValue = state.values.get(nodeId);
@@ -98,15 +102,15 @@ function buildNodeViews(
     const color = KIND_COLORS[node.kind] ?? '#888888';
 
     views.push({
-      id: nodeId as string,
+      id,
       rect,
       kind: node.kind,
-      label: `${node.kind}::${(nodeId as string).slice(0, 8)}`,
+      label: `${node.kind}::${id.slice(0, 8)}`,
       fields,
       color,
-      expression: '',
-      typeStatus: 'unchecked' as const,
-      typeError: '',
+      expression: expressions.get(id) ?? '',
+      typeStatus: typeStatusMap.get(id) ?? ('unchecked' as const),
+      typeError: typeErrors.get(id) ?? '',
     });
   }
 
@@ -149,7 +153,16 @@ function buildEdgeViews(
   return edges;
 }
 
-export function projectMesh(state: LatticeState): LawResult<MeshView> {
+export function projectMesh(
+  state: LatticeState,
+  expressions?: ReadonlyMap<string, string>,
+  typeStatusMap?: ReadonlyMap<string, TypeStatus>,
+  typeErrors?: ReadonlyMap<string, string>,
+): LawResult<MeshView> {
+  const exprMap = expressions ?? new Map<string, string>();
+  const statusMap = typeStatusMap ?? new Map<string, TypeStatus>();
+  const errorMap = typeErrors ?? new Map<string, string>();
+
   const nodeList = Array.from(state.nodes.values());
   const layoutRects = computeLayout(nodeList, state.connections);
 
@@ -160,7 +173,7 @@ export function projectMesh(state: LatticeState): LawResult<MeshView> {
     layoutMap.set(nodeId as string, rect);
   }
 
-  const nodes = buildNodeViews(state, layoutMap);
+  const nodes = buildNodeViews(state, layoutMap, exprMap, statusMap, errorMap);
   const edges = buildEdgeViews(state, nodes);
   const bounds = computeBounds(nodes);
 
