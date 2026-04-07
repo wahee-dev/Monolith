@@ -28,6 +28,13 @@ export interface FieldView {
   readonly position: Point;
 }
 
+export type TypeStatus = 'unchecked' | 'valid' | 'invalid';
+
+export interface CanvasState {
+  readonly offset: Point;
+  readonly zoom: number;
+}
+
 export interface NodeView {
   readonly id: string;
   readonly rect: Rect;
@@ -35,10 +42,15 @@ export interface NodeView {
   readonly label: string;
   readonly fields: ReadonlyArray<FieldView>;
   readonly color: string;
+  readonly expression: string;
+  readonly typeStatus: TypeStatus;
+  readonly typeError: string;
 }
 
 export interface EdgeView {
   readonly id: string;
+  readonly fromNodeId: string;
+  readonly toNodeId: string;
   readonly curve: BezierCurve;
   readonly label: string;
   readonly color: string;
