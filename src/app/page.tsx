@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import MeshPage from '@mesh/components/MeshPage';
 import { NodePalette } from '@palette/index';
 import type { PaletteState } from '@palette/types';
@@ -35,6 +35,9 @@ import type { GraphExecutionResult } from '@engine/types';
 import { useTypeCheckGuard } from '@mesh/hooks/useTypeCheckGuard';
 import type { TypeCheckDiagnostic } from '@law/typecheck';
 import { useKeyboardShortcuts } from '@mesh/hooks/useKeyboardShortcuts';
+import { TemplateDropdown } from '@templates/TemplateDropdown';
+import type { Template } from '@templates/index';
+import { getTemplateById } from '@templates/index';
 
 const KIND_SCHEMAS: Record<LatticeNodeKind, NodeSchema> = {
   source: {
@@ -268,6 +271,70 @@ export default function Home(): React.ReactElement {
     },
     [pushToHistory],
   );
+
+  const loadTemplate = useCallback(
+    (template: Template): void => {
+      pushToHistory('Load template: ' + template.name);
+
+      const nodeIdMap: string[] = [];
+      const newNodes = new Map<LatticeNodeId, LatticeNode>();
+      const newPositions = new Map<string, Point>();
+      const newExpressions = new Map<string, string>();
+
+      for (let i = 0; i < template.nodes.length; i++) {
+        const tnode = template.nodes[i]!;
+        const id = createLatticeNodeId(`${tnode.kind}-${i + 1}-${Date.now()}`);
+        nodeIdMap.push(id as string);
+        const schema = getSchemaForKind(tnode.kind);
+        const node: LatticeNode = { id, kind: tnode.kind, schema };
+        newNodes.set(id, node);
+        newPositions.set(id as string, tnode.position);
+        if (tnode.expression !== undefined) {
+          newExpressions.set(id as string, tnode.expression);
+        }
+      }
+
+      const newConnections: LatticeConnection[] = [];
+      for (let i = 0; i < template.connections.length; i++) {
+        const tc = template.connections[i]!;
+        const connId = `conn-${i + 1}-${Date.now()}`;
+        newConnections.push({
+          id: connId,
+          from: createLatticeNodeId(nodeIdMap[tc.fromNodeIndex]!),
+          to: createLatticeNodeId(nodeIdMap[tc.toNodeIndex]!),
+          fromPort: tc.fromPort,
+          toPort: tc.toPort,
+        });
+      }
+
+      const newState: LatticeState = {
+        nodes: newNodes,
+        connections: newConnections,
+        values: new Map(),
+        status: 'idle',
+        version: 1,
+      };
+
+      setLatticeState(newState);
+      setNodePositions(newPositions);
+      setExpressions(newExpressions);
+      setSelectedNodeId(null);
+      setSelectedEdgeId(null);
+      setEditingNodeId(null);
+    },
+    [pushToHistory],
+  );
+
+  const initialTemplateLoaded = useRef(false);
+
+  useEffect(() => {
+    if (initialTemplateLoaded.current) return;
+    initialTemplateLoaded.current = true;
+    if (latticeState.nodes.size === 0) {
+      const starter = getTemplateById('getting-started');
+      if (starter !== undefined) loadTemplate(starter);
+    }
+  }, [latticeState.nodes.size, loadTemplate]);
 
   const handleDeleteSelected = useCallback((): void => {
     if (selectedNodeId !== null) {
@@ -667,6 +734,8 @@ export default function Home(): React.ReactElement {
         </span>
         <span style={{ width: '1px', height: '16px', backgroundColor: '#1a1a2e' }} />
         <span style={{ color: '#4a9eff', fontWeight: 'bold', fontSize: '16px', letterSpacing: '1px' }}>MONOLITH</span>
+        <span style={{ width: '1px', height: '16px', backgroundColor: '#1a1a2e' }} />
+        <TemplateDropdown onSelect={loadTemplate} />
         <span style={{ width: '1px', height: '16px', backgroundColor: '#1a1a2e' }} />
         {executionState.mode === 'running' || executionState.mode === 'stepping' ? (
           <span
