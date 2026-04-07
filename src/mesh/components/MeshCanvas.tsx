@@ -6,6 +6,7 @@ import { useInfiniteCanvas } from '../hooks/useInfiniteCanvas';
 import { useNodeDrag } from '../hooks/useNodeDrag';
 import { NodeView as NodeViewComponent } from './NodeView';
 import { EdgeView } from './EdgeView';
+import { ExpressionEditor } from './ExpressionEditor';
 import { computeBezierPath } from '../geometry';
 
 interface MeshCanvasProps {
@@ -16,6 +17,8 @@ interface MeshCanvasProps {
   readonly onNodeMove: (nodeId: string, newPosition: Point) => void;
   readonly onNodeSelect: (nodeId: string | null) => void;
   readonly onNodeDoubleClick: (nodeId: string) => void;
+  readonly onExpressionCommit: (nodeId: string, expression: string) => void;
+  readonly onExpressionCancel: () => void;
 }
 
 function buildGridDefs(): React.ReactElement {
@@ -60,6 +63,8 @@ export function MeshCanvas({
   onNodeMove,
   onNodeSelect,
   onNodeDoubleClick,
+  onExpressionCommit,
+  onExpressionCancel,
 }: MeshCanvasProps): React.ReactElement {
   const svgW = typeof window !== 'undefined' ? window.innerWidth : 800;
   const svgH = typeof window !== 'undefined' ? window.innerHeight : 600;
@@ -140,6 +145,10 @@ export function MeshCanvas({
   const vbW = Number(vb[2] ?? 800);
   const vbH = Number(vb[3] ?? 600);
 
+  const editingNode = editingNodeId !== null
+    ? nodeMap.get(editingNodeId)
+    : undefined;
+
   return (
     <svg
       viewBox={canvas.svgProps.viewBox}
@@ -168,6 +177,15 @@ export function MeshCanvas({
           onDoubleClick={() => onNodeDoubleClick(node.id)}
         />
       ))}
+      {editingNode !== undefined && editingNodeId !== null && (
+        <ExpressionEditor
+          nodeId={editingNodeId}
+          nodeRect={editingNode.rect}
+          initialExpression={editingNode.expression}
+          onCommit={onExpressionCommit}
+          onCancel={onExpressionCancel}
+        />
+      )}
     </svg>
   );
 }

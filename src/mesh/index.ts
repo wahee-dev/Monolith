@@ -38,8 +38,11 @@ export { projectMesh } from './projector';
 export { useMeshProjection } from './hooks/useMeshProjection';
 export { useInfiniteCanvas } from './hooks/useInfiniteCanvas';
 export { useNodeDrag } from './hooks/useNodeDrag';
+export { useExpressionTypeCheck } from './hooks/useExpressionTypeCheck';
+export type { TypeCheckResult } from './hooks/useExpressionTypeCheck';
 
 export { MeshCanvas } from './components/MeshCanvas';
 export { NodeView as NodeViewComponent } from './components/NodeView';
 export { EdgeView as EdgeViewComponent } from './components/EdgeView';
 export { FieldViewComponent } from './components/FieldView';
+export { ExpressionEditor } from './components/ExpressionEditor';
