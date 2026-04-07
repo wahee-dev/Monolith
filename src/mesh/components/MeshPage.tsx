@@ -298,10 +298,10 @@ export default function MeshPage(): React.ReactElement {
   }, [selectedNodeId]);
 
   const handleRun = useCallback((): void => {
-    typeCheckGuard.runTypeCheck(expressions);
-    applyDiagnostics(typeCheckGuard.diagnostics);
+    const { diagnostics: runDiagnostics, canExecute } = typeCheckGuard.runTypeCheck(expressions);
+    applyDiagnostics(runDiagnostics);
 
-    if (!typeCheckGuard.canExecute) {
+    if (!canExecute) {
       setExecutionStatus('blocked');
       setErrorMessage('Execution blocked: type check errors detected');
       return;
