@@ -45,6 +45,9 @@
       ],
       "@palette/*": [
         "palette/*"
+      ],
+      "@minimap/*": [
+        "minimap/*"
       ]
     },
     "plugins": [
