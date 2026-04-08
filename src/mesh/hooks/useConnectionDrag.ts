@@ -181,6 +181,17 @@ export function useConnectionDrag(options: UseConnectionDragOptions): UseConnect
         return;
       }
 
+      const targetDirection = source.portType === 'output' ? 'input' : 'output';
+      const allPorts = getAllPorts();
+      const isValidTarget = allPorts.some(
+        (p) => p.nodeId === targetNodeId && p.portName === targetPortName && p.direction === targetDirection,
+      );
+      if (!isValidTarget) {
+        sourceRef.current = null;
+        setDragState(null);
+        return;
+      }
+
       if (!canConnectTypes(fromDataType, toDataType)) {
         onConnectionValidationError?.(fromDataType, toDataType);
         sourceRef.current = null;
