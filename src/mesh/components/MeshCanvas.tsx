@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useMemo } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { MeshView, Point } from '../types';
 import type { PortType } from '@engine/types';
 import { useInfiniteCanvas } from '../hooks/useInfiniteCanvas';
@@ -285,9 +285,15 @@ export function MeshCanvas({
   onEdgeSelect,
   existingConnections,
 }: MeshCanvasProps): React.ReactElement {
-  const svgW = typeof window !== 'undefined' ? window.innerWidth : 800;
-  const svgH = typeof window !== 'undefined' ? window.innerHeight : 600;
-  const canvas = useInfiniteCanvas(svgW, svgH);
+  const [svgDims, setSvgDims] = useState({ width: 800, height: 600 });
+  useEffect(() => {
+    setSvgDims({ width: window.innerWidth, height: window.innerHeight });
+    const handleResize = (): void =>
+      setSvgDims({ width: window.innerWidth, height: window.innerHeight });
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+  const canvas = useInfiniteCanvas(svgDims.width, svgDims.height);
   const drag = useNodeDrag({
     canvasState: canvas.canvasState,
     nodePositions,
@@ -332,6 +338,12 @@ export function MeshCanvas({
             ...p,
             position: { x: p.position.x + dx, y: p.position.y + dy },
           })),
+          fields: node.fields
+            ? node.fields.map((f) => ({
+                ...f,
+                position: { x: f.position.x + dx, y: f.position.y + dy },
+              }))
+            : node.fields,
         };
       }
       return node;
@@ -567,8 +579,8 @@ export function MeshCanvas({
         onPanTo={(x: number, y: number): void => {
           canvas.panTo({ x: x + vbW / 2, y: y + vbH / 2 });
         }}
-        canvasWidth={svgW}
-        canvasHeight={svgH}
+        canvasWidth={svgDims.width}
+        canvasHeight={svgDims.height}
       />
     </div>
   );

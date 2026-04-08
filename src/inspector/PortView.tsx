@@ -34,8 +34,8 @@ export function PortView({ name, type, value, isConnected }: PortViewProps): Rea
   return (
     <div
       style={{
-        padding: '6px 0',
-        borderBottom: '1px solid #2a2a3e',
+        padding: '4px 0',
+        borderBottom: '1px solid #1a1a2e',
       }}
     >
       <div
@@ -45,11 +45,11 @@ export function PortView({ name, type, value, isConnected }: PortViewProps): Rea
           justifyContent: 'space-between',
         }}
       >
-        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
           <div
             style={{
-              width: '8px',
-              height: '8px',
+              width: '6px',
+              height: '6px',
               borderRadius: '50%',
               border: isConnected ? `2px solid #22c55e` : '2px solid #555',
               backgroundColor: isConnected ? '#22c55e' : 'transparent',
@@ -60,7 +60,7 @@ export function PortView({ name, type, value, isConnected }: PortViewProps): Rea
             style={{
               color: '#e0e0e0',
               fontFamily: 'monospace',
-              fontSize: '12px',
+              fontSize: '11px',
               fontWeight: 'bold',
             }}
           >
@@ -71,9 +71,9 @@ export function PortView({ name, type, value, isConnected }: PortViewProps): Rea
           style={{
             color,
             backgroundColor: `${color}22`,
-            padding: '2px 8px',
-            borderRadius: '10px',
-            fontSize: '10px',
+            padding: '1px 5px',
+            borderRadius: '8px',
+            fontSize: '9px',
             fontFamily: 'monospace',
           }}
         >
@@ -83,11 +83,11 @@ export function PortView({ name, type, value, isConnected }: PortViewProps): Rea
       {displayValue.length > 0 && (
         <div
           style={{
-            marginTop: '4px',
-            marginLeft: '14px',
-            color: '#888888',
+            marginTop: '2px',
+            marginLeft: '10px',
+            color: '#777',
             fontFamily: 'monospace',
-            fontSize: '11px',
+            fontSize: '10px',
             wordBreak: 'break-all',
           }}
         >

@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import MeshPage from '@mesh/components/MeshPage';
 import { NodePalette } from '@palette/index';
 import type { PaletteState } from '@palette/types';
@@ -35,6 +35,9 @@ import type { GraphExecutionResult } from '@engine/types';
 import { useTypeCheckGuard } from '@mesh/hooks/useTypeCheckGuard';
 import type { TypeCheckDiagnostic } from '@law/typecheck';
 import { useKeyboardShortcuts } from '@mesh/hooks/useKeyboardShortcuts';
+import { TemplateDropdown } from '@templates/TemplateDropdown';
+import type { Template } from '@templates/index';
+import { getTemplateById } from '@templates/index';
 
 const KIND_SCHEMAS: Record<LatticeNodeKind, NodeSchema> = {
   source: {
@@ -268,6 +271,70 @@ export default function Home(): React.ReactElement {
     },
     [pushToHistory],
   );
+
+  const loadTemplate = useCallback(
+    (template: Template): void => {
+      pushToHistory('Load template: ' + template.name);
+
+      const nodeIdMap: string[] = [];
+      const newNodes = new Map<LatticeNodeId, LatticeNode>();
+      const newPositions = new Map<string, Point>();
+      const newExpressions = new Map<string, string>();
+
+      for (let i = 0; i < template.nodes.length; i++) {
+        const tnode = template.nodes[i]!;
+        const id = createLatticeNodeId(`${tnode.kind}-${i + 1}-${Date.now()}`);
+        nodeIdMap.push(id as string);
+        const schema = getSchemaForKind(tnode.kind);
+        const node: LatticeNode = { id, kind: tnode.kind, schema };
+        newNodes.set(id, node);
+        newPositions.set(id as string, tnode.position);
+        if (tnode.expression !== undefined) {
+          newExpressions.set(id as string, tnode.expression);
+        }
+      }
+
+      const newConnections: LatticeConnection[] = [];
+      for (let i = 0; i < template.connections.length; i++) {
+        const tc = template.connections[i]!;
+        const connId = `conn-${i + 1}-${Date.now()}`;
+        newConnections.push({
+          id: connId,
+          from: createLatticeNodeId(nodeIdMap[tc.fromNodeIndex]!),
+          to: createLatticeNodeId(nodeIdMap[tc.toNodeIndex]!),
+          fromPort: tc.fromPort,
+          toPort: tc.toPort,
+        });
+      }
+
+      const newState: LatticeState = {
+        nodes: newNodes,
+        connections: newConnections,
+        values: new Map(),
+        status: 'idle',
+        version: 1,
+      };
+
+      setLatticeState(newState);
+      setNodePositions(newPositions);
+      setExpressions(newExpressions);
+      setSelectedNodeId(null);
+      setSelectedEdgeId(null);
+      setEditingNodeId(null);
+    },
+    [pushToHistory],
+  );
+
+  const initialTemplateLoaded = useRef(false);
+
+  useEffect(() => {
+    if (initialTemplateLoaded.current) return;
+    initialTemplateLoaded.current = true;
+    if (latticeState.nodes.size === 0) {
+      const starter = getTemplateById('getting-started');
+      if (starter !== undefined) loadTemplate(starter);
+    }
+  }, [latticeState.nodes.size, loadTemplate]);
 
   const handleDeleteSelected = useCallback((): void => {
     if (selectedNodeId !== null) {
@@ -648,34 +715,38 @@ export default function Home(): React.ReactElement {
       <div style={{
         display: 'flex',
         alignItems: 'center',
-        gap: '12px',
-        padding: '8px 16px',
+        gap: '6px',
+        height: '44px',
+        padding: '0 12px',
         backgroundColor: '#0c0c14',
         borderBottom: '1px solid #1a1a2e',
-        fontSize: '12px',
+        fontSize: '11px',
         color: '#888888',
         zIndex: 10,
         flexShrink: 0,
       }}>
         <span
-          style={{ cursor: 'pointer', color: paletteState.isOpen ? '#00ffff' : '#aaaaaa', fontSize: '16px' }}
+          style={{ cursor: 'pointer', color: paletteState.isOpen ? '#00ffff' : '#aaaaaa', fontSize: '14px', lineHeight: 1 }}
           onClick={handleTogglePalette}
           title="Toggle Palette (Space)"
         >
           &#9776;
         </span>
-        <span style={{ color: '#555555' }}>|</span>
-        <span style={{ color: '#4a9eff', fontWeight: 'bold', letterSpacing: '2px' }}>MONOLITH ENGINE</span>
-        <span style={{ color: '#555555' }}>|</span>
+        <span style={{ width: '1px', height: '16px', backgroundColor: '#1a1a2e' }} />
+        <span style={{ color: '#4a9eff', fontWeight: 'bold', fontSize: '16px', letterSpacing: '1px' }}>MONOLITH</span>
+        <span style={{ width: '1px', height: '16px', backgroundColor: '#1a1a2e' }} />
+        <TemplateDropdown onSelect={loadTemplate} />
+        <span style={{ width: '1px', height: '16px', backgroundColor: '#1a1a2e' }} />
         {executionState.mode === 'running' || executionState.mode === 'stepping' ? (
           <span
             style={{
               cursor: 'pointer',
               color: '#f59e0b',
               fontWeight: 'bold',
-              padding: '2px 10px',
+              padding: '1px 8px',
               border: '1px solid #f59e0b',
               borderRadius: '3px',
+              fontSize: '10px',
             }}
             onClick={handleStop}
             title="Stop (Ctrl+.)"
@@ -688,9 +759,10 @@ export default function Home(): React.ReactElement {
               cursor: 'pointer',
               color: errorCount > 0 ? '#ef4444' : '#22c55e',
               fontWeight: 'bold',
-              padding: '2px 10px',
+              padding: '1px 8px',
               border: `1px solid ${errorCount > 0 ? '#ef4444' : '#22c55e'}`,
               borderRadius: '3px',
+              fontSize: '10px',
             }}
             onClick={handleRun}
             title="Run (Ctrl+Enter)"
@@ -702,42 +774,44 @@ export default function Home(): React.ReactElement {
           style={{
             cursor: historyCanUndo(historyState) ? 'pointer' : 'default',
             color: historyCanUndo(historyState) ? '#aaaaaa' : '#444444',
+            padding: '0 2px',
           }}
           onClick={handleUndo}
           title="Undo (Ctrl+Z)"
         >
-          &#8630; Undo
+          &#8630;
         </span>
         <span
           style={{
             cursor: historyCanRedo(historyState) ? 'pointer' : 'default',
             color: historyCanRedo(historyState) ? '#aaaaaa' : '#444444',
+            padding: '0 2px',
           }}
           onClick={handleRedo}
           title="Redo (Ctrl+Shift+Z)"
         >
-          &#8631; Redo
+          &#8631;
         </span>
-        <span style={{ color: '#555555' }}>|</span>
+        <span style={{ width: '1px', height: '16px', backgroundColor: '#1a1a2e' }} />
         <div style={{
           display: 'flex',
           alignItems: 'center',
-          gap: '4px',
+          gap: '3px',
         }}>
           <div style={{
-            width: '8px',
-            height: '8px',
+            width: '6px',
+            height: '6px',
             borderRadius: '50%',
             backgroundColor: statusColor,
-            boxShadow: executionState.mode === 'running' ? '0 0 6px #22c55e' : 'none',
+            boxShadow: executionState.mode === 'running' ? '0 0 4px #22c55e' : 'none',
           }} />
-          <span style={{ color: statusColor, fontWeight: 'bold', fontSize: '10px' }}>{statusLabel}</span>
+          <span style={{ color: statusColor, fontWeight: 'bold', fontSize: '9px' }}>{statusLabel}</span>
         </div>
-        <span style={{ color: '#555555' }}>
-          {latticeState.nodes.size} nodes
+        <span style={{ color: '#666', fontSize: '10px' }}>
+          {latticeState.nodes.size}n
         </span>
         {executionResult !== null && (
-          <span style={{ color: '#888888', fontSize: '10px' }}>
+          <span style={{ color: '#666', fontSize: '9px' }}>
             {executionResult.durationMs}ms
           </span>
         )}
@@ -745,10 +819,10 @@ export default function Home(): React.ReactElement {
           style={{
             marginLeft: 'auto',
             cursor: 'pointer',
-            color: showPreview ? '#00ffff' : '#888888',
-            fontSize: '10px',
-            padding: '2px 8px',
-            border: `1px solid ${showPreview ? '#00ffff' : '#2a2a3e'}`,
+            color: showPreview ? '#00ffff' : '#666',
+            fontSize: '9px',
+            padding: '1px 6px',
+            border: `1px solid ${showPreview ? '#00ffff' : '#222'}`,
             borderRadius: '3px',
           }}
           onClick={(): void => setShowPreview(!showPreview)}
@@ -836,56 +910,57 @@ export default function Home(): React.ReactElement {
       <div style={{
         display: 'flex',
         alignItems: 'center',
-        gap: '8px',
-        padding: '4px 16px',
-        backgroundColor: '#0c0c14',
+        gap: '4px',
+        height: '28px',
+        padding: '0 12px',
+        backgroundColor: '#111',
         borderTop: '1px solid #1a1a2e',
-        fontSize: '10px',
+        fontSize: '11px',
         color: '#888888',
         flexShrink: 0,
       }}>
         <div style={{
-          width: '8px',
-          height: '8px',
+          width: '6px',
+          height: '6px',
           borderRadius: '50%',
           backgroundColor: statusColor,
-          boxShadow: executionState.mode === 'running' ? '0 0 6px #22c55e' : 'none',
+          boxShadow: executionState.mode === 'running' ? '0 0 4px #22c55e' : 'none',
         }} />
-        <span style={{ color: statusColor, fontWeight: 'bold' }}>{statusLabel}</span>
-        <span style={{ color: '#555555' }}>|</span>
-        <span>{latticeState.nodes.size} nodes &middot; {latticeState.connections.length} edges</span>
+        <span style={{ color: statusColor, fontWeight: 'bold', fontSize: '10px' }}>{statusLabel}</span>
+        <span style={{ color: '#333' }}>|</span>
+        <span style={{ fontSize: '10px' }}>{latticeState.nodes.size}n {latticeState.connections.length}e</span>
         {errorCount > 0 && (
           <>
-            <span style={{ color: '#555555' }}>|</span>
-            <span style={{ color: '#ef4444', cursor: 'pointer' }}>
-              {errorCount} error{errorCount !== 1 ? 's' : ''}
+            <span style={{ color: '#333' }}>|</span>
+            <span style={{ color: '#ef4444', cursor: 'pointer', fontSize: '10px' }}>
+              {errorCount}err
             </span>
           </>
         )}
         {warningCount > 0 && (
           <>
-            <span style={{ color: '#555555' }}>|</span>
-            <span style={{ color: '#f59e0b' }}>
-              {warningCount} warning{warningCount !== 1 ? 's' : ''}
+            <span style={{ color: '#333' }}>|</span>
+            <span style={{ color: '#f59e0b', fontSize: '10px' }}>
+              {warningCount}warn
             </span>
           </>
         )}
         {errorCount === 0 && warningCount === 0 && (
           <>
-            <span style={{ color: '#555555' }}>|</span>
-            <span style={{ color: '#22c55e' }}>&#10003; no errors</span>
+            <span style={{ color: '#333' }}>|</span>
+            <span style={{ color: '#22c55e', fontSize: '10px' }}>&#10003;</span>
           </>
         )}
         {executionResult !== null && (
           <>
-            <span style={{ color: '#555555' }}>|</span>
-            <span style={{ color: '#00ffff' }}>
-              trace: {executionResult.trace.length} steps
+            <span style={{ color: '#333' }}>|</span>
+            <span style={{ color: '#00ffff', fontSize: '10px' }}>
+              trace:{executionResult.trace.length}
             </span>
           </>
         )}
-        <span style={{ marginLeft: 'auto', color: '#555555' }}>
-          {expressions.size} expressions &middot; v{latticeState.version}
+        <span style={{ marginLeft: 'auto', color: '#555', fontSize: '10px' }}>
+          {expressions.size}exp v{latticeState.version}
         </span>
       </div>
     </div>

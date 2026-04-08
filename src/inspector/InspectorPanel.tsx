@@ -71,7 +71,7 @@ export function InspectorPanel({
   return (
     <div
       style={{
-        width: '280px',
+        width: '260px',
         height: '100%',
         backgroundColor: '#0c0c14',
         borderLeft: '1px solid #2a2a3e',
@@ -89,16 +89,16 @@ export function InspectorPanel({
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'space-between',
-              padding: '12px',
+              padding: '8px',
               borderBottom: '1px solid #2a2a3e',
               backgroundColor: '#14141f',
             }}
           >
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
               <span
                 style={{
                   color: '#e0e0e0',
-                  fontSize: '14px',
+                  fontSize: '13px',
                   fontWeight: 'bold',
                   fontFamily: 'monospace',
                 }}
@@ -109,9 +109,9 @@ export function InspectorPanel({
                 style={{
                   color: CATEGORY_COLORS[nodeDefinition.category],
                   backgroundColor: `${CATEGORY_COLORS[nodeDefinition.category]}22`,
-                  padding: '2px 8px',
-                  borderRadius: '10px',
-                  fontSize: '10px',
+                  padding: '1px 6px',
+                  borderRadius: '8px',
+                  fontSize: '9px',
                   fontFamily: 'monospace',
                   textTransform: 'uppercase',
                 }}
@@ -146,11 +146,11 @@ export function InspectorPanel({
               gap: '0',
             }}
           >
-            <div style={{ padding: '12px', borderBottom: '1px solid #2a2a3e' }}>
+            <div style={{ padding: '8px', borderBottom: '1px solid #2a2a3e' }}>
               <span
                 style={{
-                  color: '#888888',
-                  fontSize: '11px',
+                  color: '#666',
+                  fontSize: '10px',
                   fontFamily: 'monospace',
                   fontWeight: 'bold',
                   textTransform: 'uppercase',
@@ -161,10 +161,10 @@ export function InspectorPanel({
               </span>
               <p
                 style={{
-                  color: '#e0e0e0',
-                  fontSize: '11px',
+                  color: '#ccc',
+                  fontSize: '10px',
                   fontFamily: 'monospace',
-                  margin: '4px 0 0 0',
+                  margin: '2px 0 0 0',
                   lineHeight: 1.4,
                 }}
               >
@@ -173,11 +173,11 @@ export function InspectorPanel({
             </div>
 
             {(nodeDefinition.inputs.length > 0 || nodeDefinition.outputs.length > 0) && (
-              <div style={{ padding: '12px', borderBottom: '1px solid #2a2a3e' }}>
+              <div style={{ padding: '8px', borderBottom: '1px solid #2a2a3e' }}>
                 <span
                   style={{
-                    color: '#888888',
-                    fontSize: '11px',
+                    color: '#666',
+                    fontSize: '10px',
                     fontFamily: 'monospace',
                     fontWeight: 'bold',
                     textTransform: 'uppercase',
@@ -186,13 +186,13 @@ export function InspectorPanel({
                 >
                   Ports
                 </span>
-                <div style={{ marginTop: '8px' }}>
+                <div style={{ marginTop: '4px' }}>
                   {nodeDefinition.inputs.length > 0 && (
-                    <div style={{ marginBottom: '8px' }}>
+                    <div style={{ marginBottom: '4px' }}>
                       <span
                         style={{
                           color: '#4a9eff',
-                          fontSize: '10px',
+                          fontSize: '9px',
                           fontFamily: 'monospace',
                           textTransform: 'uppercase',
                         }}
@@ -215,7 +215,7 @@ export function InspectorPanel({
                       <span
                         style={{
                           color: '#22c55e',
-                          fontSize: '10px',
+                          fontSize: '9px',
                           fontFamily: 'monospace',
                           textTransform: 'uppercase',
                         }}
@@ -237,17 +237,17 @@ export function InspectorPanel({
               </div>
             )}
 
-            <div style={{ padding: '12px', borderBottom: '1px solid #2a2a3e' }}>
+            <div style={{ padding: '8px', borderBottom: '1px solid #2a2a3e' }}>
               <span
                 style={{
-                  color: '#888888',
-                  fontSize: '11px',
+                  color: '#666',
+                  fontSize: '10px',
                   fontFamily: 'monospace',
                   fontWeight: 'bold',
                   textTransform: 'uppercase',
                   letterSpacing: '0.5px',
                   display: 'block',
-                  marginBottom: '6px',
+                  marginBottom: '4px',
                 }}
               >
                 Expression
@@ -259,14 +259,14 @@ export function InspectorPanel({
                 placeholder="Enter expression..."
                 style={{
                   width: '100%',
-                  minHeight: '150px',
+                  minHeight: '120px',
                   backgroundColor: '#1a1a2e',
                   color: '#e0e0e0',
                   border: `1px solid ${expressionValid ? '#2a2a3e' : '#ef4444'}`,
                   borderRadius: '4px',
-                  padding: '8px',
+                  padding: '6px',
                   fontFamily: 'monospace',
-                  fontSize: '12px',
+                  fontSize: '11px',
                   resize: 'vertical',
                   outline: 'none',
                   boxSizing: 'border-box',
@@ -282,7 +282,7 @@ export function InspectorPanel({
                 <span
                   style={{
                     color: expressionValid ? '#22c55e' : '#ef4444',
-                    fontSize: '10px',
+                    fontSize: '9px',
                     fontFamily: 'monospace',
                   }}
                 >
@@ -292,7 +292,7 @@ export function InspectorPanel({
             </div>
 
             {nodeDefinition.editableSchema && (
-              <div style={{ padding: '12px', borderBottom: '1px solid #2a2a3e' }}>
+              <div style={{ padding: '8px', borderBottom: '1px solid #2a2a3e' }}>
                 <SchemaEditor
                   schema={{
                     input: Object.fromEntries(
@@ -313,7 +313,7 @@ export function InspectorPanel({
               </div>
             )}
 
-            <div style={{ padding: '12px', borderBottom: '1px solid #2a2a3e' }}>
+            <div style={{ padding: '8px', borderBottom: '1px solid #2a2a3e' }}>
               <div
                 style={{
                   display: 'flex',
@@ -332,8 +332,8 @@ export function InspectorPanel({
               >
                 <span
                   style={{
-                    color: '#888888',
-                    fontSize: '11px',
+                    color: '#666',
+                    fontSize: '10px',
                     fontFamily: 'monospace',
                     fontWeight: 'bold',
                     textTransform: 'uppercase',
@@ -344,8 +344,8 @@ export function InspectorPanel({
                 </span>
                 <span
                   style={{
-                    color: '#888888',
-                    fontSize: '10px',
+                    color: '#666',
+                    fontSize: '9px',
                     fontFamily: 'monospace',
                   }}
                 >
@@ -355,11 +355,11 @@ export function InspectorPanel({
               {lastExecutionTime > 0 && (
                 <span
                   style={{
-                    color: '#888888',
-                    fontSize: '10px',
+                    color: '#666',
+                    fontSize: '9px',
                     fontFamily: 'monospace',
                     display: 'block',
-                    marginTop: '2px',
+                    marginTop: '1px',
                   }}
                 >
                   {lastExecutionTime}ms
@@ -369,10 +369,10 @@ export function InspectorPanel({
                 <div
                   style={{
                     color: '#ef4444',
-                    fontSize: '11px',
+                    fontSize: '10px',
                     fontFamily: 'monospace',
-                    marginTop: '4px',
-                    padding: '6px',
+                    marginTop: '3px',
+                    padding: '4px',
                     backgroundColor: '#1a0a0a',
                     borderRadius: '3px',
                     border: '1px solid #ef4444',
@@ -385,14 +385,14 @@ export function InspectorPanel({
                 <pre
                   style={{
                     color: '#e0e0e0',
-                    fontSize: '11px',
+                    fontSize: '10px',
                     fontFamily: 'monospace',
-                    margin: '8px 0 0 0',
-                    padding: '8px',
+                    margin: '4px 0 0 0',
+                    padding: '6px',
                     backgroundColor: '#14141f',
                     borderRadius: '3px',
                     border: '1px solid #2a2a3e',
-                    maxHeight: '200px',
+                    maxHeight: '160px',
                     overflow: 'auto',
                     whiteSpace: 'pre-wrap',
                     wordBreak: 'break-all',
@@ -404,17 +404,17 @@ export function InspectorPanel({
             </div>
 
             {validationErrors.length > 0 && (
-              <div style={{ padding: '12px' }}>
+              <div style={{ padding: '8px' }}>
                 <span
                   style={{
                     color: '#ef4444',
-                    fontSize: '11px',
+                    fontSize: '10px',
                     fontFamily: 'monospace',
                     fontWeight: 'bold',
                     textTransform: 'uppercase',
                     letterSpacing: '0.5px',
                     display: 'block',
-                    marginBottom: '6px',
+                    marginBottom: '4px',
                   }}
                 >
                   Errors ({validationErrors.length})
@@ -424,13 +424,13 @@ export function InspectorPanel({
                     key={`error-${index}`}
                     style={{
                       color: '#ef4444',
-                      fontSize: '11px',
+                      fontSize: '10px',
                       fontFamily: 'monospace',
-                      padding: '4px 6px',
+                      padding: '3px 5px',
                       backgroundColor: '#1a0a0a',
                       borderRadius: '3px',
                       border: '1px solid #2a2a3e',
-                      marginBottom: '4px',
+                      marginBottom: '3px',
                     }}
                   >
                     {error}
