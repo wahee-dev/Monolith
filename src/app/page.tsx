@@ -38,6 +38,7 @@ import { useKeyboardShortcuts } from '@mesh/hooks/useKeyboardShortcuts';
 import { TemplateDropdown } from '@templates/TemplateDropdown';
 import type { Template } from '@templates/index';
 import { getTemplateById } from '@templates/index';
+import { AIPane } from '@ai/index';
 
 const KIND_SCHEMAS: Record<LatticeNodeKind, NodeSchema> = {
   source: {
@@ -166,6 +167,7 @@ export default function Home(): React.ReactElement {
   const [errorMessage, setErrorMessage] = useState<string>('');
   const [executionResult, setExecutionResult] = useState<GraphExecutionResult | null>(null);
   const [showPreview, setShowPreview] = useState<boolean>(false);
+  const [showAI, setShowAI] = useState<boolean>(true);
 
   const kindCounters = useRef<Map<string, number>>(new Map());
   const executionTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -594,6 +596,43 @@ export default function Home(): React.ReactElement {
     setSelectedNodeId(null);
   }, []);
 
+  const handleAIAddNode = useCallback(
+    (kind: string): void => {
+      handleAddNode(kind);
+    },
+    [handleAddNode],
+  );
+
+  const handleAIAddConnection = useCallback(
+    (fromNodeId: string, fromPort: string, toNodeId: string, toPort: string): void => {
+      handleConnectionCreate(fromNodeId, fromPort, toNodeId, toPort);
+    },
+    [handleConnectionCreate],
+  );
+
+  const handleAISetExpression = useCallback(
+    (nodeId: string, expression: string): void => {
+      handleExpressionCommit(nodeId, expression);
+    },
+    [handleExpressionCommit],
+  );
+
+  const handleAIDeleteNode = useCallback(
+    (nodeId: string): void => {
+      setSelectedNodeId(nodeId);
+      handleDeleteSelected();
+    },
+    [handleDeleteSelected],
+  );
+
+  const handleAIDeleteConnection = useCallback(
+    (connectionId: string): void => {
+      setSelectedEdgeId(connectionId);
+      handleDeleteSelected();
+    },
+    [handleDeleteSelected],
+  );
+
   useKeyboardShortcuts(
     {
       onUndo: handleUndo,
@@ -829,6 +868,20 @@ export default function Home(): React.ReactElement {
         >
           PREVIEW
         </span>
+        <span
+          style={{
+            marginLeft: '4px',
+            cursor: 'pointer',
+            color: showAI ? '#00ffff' : '#666',
+            fontSize: '9px',
+            padding: '1px 6px',
+            border: `1px solid ${showAI ? '#00ffff' : '#222'}`,
+            borderRadius: '3px',
+          }}
+          onClick={(): void => setShowAI(!showAI)}
+        >
+          AI
+        </span>
       </div>
 
       {errorMessage.length > 0 && (
@@ -905,6 +958,19 @@ export default function Home(): React.ReactElement {
           onSchemaChange={handleInspectorSchemaChange}
           onClose={handleInspectorClose}
         />
+
+        {showAI && (
+          <AIPane
+            latticeState={latticeState}
+            nodePositions={nodePositions}
+            expressions={expressions}
+            onAddNode={handleAIAddNode}
+            onAddConnection={handleAIAddConnection}
+            onSetExpression={handleAISetExpression}
+            onDeleteNode={handleAIDeleteNode}
+            onDeleteConnection={handleAIDeleteConnection}
+          />
+        )}
       </div>
 
       <div style={{

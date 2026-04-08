@@ -19,6 +19,7 @@ export interface Template {
   readonly id: string;
   readonly name: string;
   readonly description: string;
+  readonly notes: string;
   readonly category: TemplateCategory;
   readonly nodes: ReadonlyArray<TemplateNode>;
   readonly connections: ReadonlyArray<TemplateConnection>;
@@ -28,6 +29,7 @@ const GETTING_STARTED: Template = {
   id: 'getting-started',
   name: 'Getting Started',
   description: 'A simple source to sink pipeline',
+  notes: 'A beginner-friendly template showing a basic data flow. The source node emits "Hello World", the transform node passes it through, and the sink logs it.',
   category: 'Tutorial',
   nodes: [
     { kind: 'source', position: { x: 80, y: 160 }, expression: '"Hello World"' },
@@ -44,6 +46,7 @@ const DATA_FLOW: Template = {
   id: 'data-flow',
   name: 'Data Flow',
   description: 'Split and merge data streams',
+  notes: 'Demonstrates data splitting and merging. Input flows through a split node to two transforms, then merges back together.',
   category: 'Starter',
   nodes: [
     { kind: 'source', position: { x: 60, y: 200 }, expression: '"input data"' },
@@ -67,6 +70,7 @@ const CONDITIONAL_GATE: Template = {
   id: 'conditional-gate',
   name: 'Conditional Gate',
   description: 'Use a gate to conditionally pass data',
+  notes: 'Shows conditional logic using a gate node. The second source outputs true/false to control whether data passes through.',
   category: 'Example',
   nodes: [
     { kind: 'source', position: { x: 60, y: 160 }, expression: '"payload"' },

@@ -120,6 +120,11 @@ export function TemplateDropdown({ onSelect }: TemplateDropdownProps): React.Rea
                     <div style={{ fontSize: '9px', color: '#777777', marginTop: '1px' }}>
                       {template.description}
                     </div>
+                    {template.notes && (
+                      <div style={{ fontSize: '8px', color: '#4a9eff', marginTop: '2px', fontStyle: 'italic' }}>
+                        {template.notes}
+                      </div>
+                    )}
                   </button>
                 ))}
               </div>
