@@ -13,6 +13,7 @@ interface InspectorPanelProps {
   readonly onExpressionCommit: (expression: string) => void;
   readonly onSchemaChange: (schema: NodeSchema) => void;
   readonly onClose: () => void;
+  readonly onNameComponent?: (name: string) => void;
 }
 
 const CATEGORY_COLORS: Record<NodeCategory, string> = {
@@ -38,6 +39,7 @@ export function InspectorPanel({
   onExpressionCommit,
   onSchemaChange,
   onClose,
+  onNameComponent,
 }: InspectorPanelProps): React.ReactElement {
   const [outputExpanded, setOutputExpanded] = useState<boolean>(false);
   const [expressionText, setExpressionText] = useState<string>(inspectorState.expression);
@@ -119,6 +121,29 @@ export function InspectorPanel({
                 {nodeDefinition.category}
               </span>
             </div>
+            {onNameComponent && (
+              <button
+                type="button"
+                onClick={(): void => {
+                  const name = prompt('Enter component name:');
+                  if (name && name.trim()) {
+                    onNameComponent(name.trim());
+                  }
+                }}
+                style={{
+                  backgroundColor: '#1a1a2e',
+                  color: '#00ffff',
+                  border: '1px solid #00ffff',
+                  borderRadius: '3px',
+                  cursor: 'pointer',
+                  fontSize: '9px',
+                  padding: '2px 6px',
+                  fontFamily: 'monospace',
+                }}
+              >
+                + Component
+              </button>
+            )}
             <button
               type="button"
               onClick={onClose}

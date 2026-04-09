@@ -38,6 +38,7 @@ import { useKeyboardShortcuts } from '@mesh/hooks/useKeyboardShortcuts';
 import { TemplateDropdown } from '@templates/TemplateDropdown';
 import type { Template } from '@templates/index';
 import { getTemplateById } from '@templates/index';
+import { getMonolithAPI } from '@engine/monolith-api';
 
 const KIND_SCHEMAS: Record<LatticeNodeKind, NodeSchema> = {
   source: {
@@ -594,6 +595,58 @@ export default function Home(): React.ReactElement {
     setSelectedNodeId(null);
   }, []);
 
+  const handleNameComponent = useCallback(
+    (name: string): void => {
+      if (selectedNodeId === null) return;
+      const Monolith = getMonolithAPI();
+
+      const selectedNode = latticeState.nodes.get(selectedNodeId as LatticeNodeId);
+      if (!selectedNode) return;
+
+      const subgraphNodes = new Map<LatticeNodeId, LatticeNode>();
+      const subgraphConnections: LatticeConnection[] = [];
+      const positions = new Map<string, Point>();
+
+      subgraphNodes.set(selectedNodeId as LatticeNodeId, selectedNode);
+      positions.set(selectedNodeId as string, nodePositions.get(selectedNodeId) ?? { x: 0, y: 0 });
+
+      for (let i = 0; i < latticeState.connections.length; i++) {
+        const conn = latticeState.connections[i]!;
+        const fromId = conn.from as string;
+        const toId = conn.to as string;
+
+        if (fromId === selectedNodeId || toId === selectedNodeId) {
+          subgraphConnections.push(conn);
+
+          if (fromId !== selectedNodeId) {
+            const fromNode = latticeState.nodes.get(conn.from);
+            if (fromNode && !subgraphNodes.has(conn.from)) {
+              subgraphNodes.set(conn.from, fromNode);
+              positions.set(fromId, nodePositions.get(fromId) ?? { x: 0, y: 0 });
+            }
+          }
+
+          if (toId !== selectedNodeId) {
+            const toNode = latticeState.nodes.get(conn.to);
+            if (toNode && !subgraphNodes.has(conn.to)) {
+              subgraphNodes.set(conn.to, toNode);
+              positions.set(toId, nodePositions.get(toId) ?? { x: 0, y: 0 });
+            }
+          }
+        }
+      }
+
+      Monolith.registerComponent(name, {
+        nodes: subgraphNodes as Map<string, unknown>,
+        connections: subgraphConnections,
+        positions: positions as Map<string, { x: number; y: number }>,
+      });
+
+      Monolith.notify(`Component "${name}" registered!`, 'success');
+    },
+    [selectedNodeId, latticeState, nodePositions],
+  );
+
   useKeyboardShortcuts(
     {
       onUndo: handleUndo,
@@ -904,6 +957,7 @@ export default function Home(): React.ReactElement {
           onExpressionCommit={handleInspectorExpressionCommit}
           onSchemaChange={handleInspectorSchemaChange}
           onClose={handleInspectorClose}
+          onNameComponent={handleNameComponent}
         />
       </div>
 

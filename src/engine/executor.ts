@@ -11,6 +11,7 @@ import type {
 import { validateGraph } from './validator';
 import { executeNode } from '@lattice/nodes';
 import { parseAndTypeCheck, evaluate } from '@lattice/expression';
+import { isJSHybrid, evaluateJS } from './index';
 
 function inferPortType(value: unknown): PortType {
   if (typeof value === 'string') return 'string';
@@ -260,21 +261,34 @@ export function executeGraph(
 
     const expr = expressions.get(nodeId);
     if (expr !== undefined && expr.length > 0) {
-      const parsed = parseAndTypeCheck(expr);
-      if (!parsed.ok) {
-        return { ok: false, error: parsed.error };
-      }
-      const env = envResult.ok
-        ? envResult.value
-        : (new Map<string, unknown>() as Environment);
-      const evalResult = evaluate(parsed.value.expression, env);
-      if (!evalResult.ok) {
-        return { ok: false, error: evalResult.error };
-      }
+      if (isJSHybrid(expr)) {
+        const env = envResult.ok
+          ? Object.fromEntries(envResult.value)
+          : {};
+        const jsResult = evaluateJS(expr, env);
+        if (!jsResult.ok) {
+          return { ok: false, error: { code: 'TOKEN_INVALID', message: jsResult.error ?? 'JS evaluation failed' } };
+        }
+        const outputKeys = Object.keys(node.schema.output);
+        const primaryPort = outputKeys[0] ?? 'output';
+        output = { [primaryPort]: jsResult.value };
+      } else {
+        const parsed = parseAndTypeCheck(expr);
+        if (!parsed.ok) {
+          return { ok: false, error: parsed.error };
+        }
+        const env = envResult.ok
+          ? envResult.value
+          : (new Map<string, unknown>() as Environment);
+        const evalResult = evaluate(parsed.value.expression, env);
+        if (!evalResult.ok) {
+          return { ok: false, error: evalResult.error };
+        }
 
-      const outputKeys = Object.keys(node.schema.output);
-      const primaryPort = outputKeys[0] ?? 'output';
-      output = { [primaryPort]: evalResult.value.value };
+        const outputKeys = Object.keys(node.schema.output);
+        const primaryPort = outputKeys[0] ?? 'output';
+        output = { [primaryPort]: evalResult.value.value };
+      }
     } else {
       const input: Record<string, unknown> = {};
       if (envResult.ok) {
