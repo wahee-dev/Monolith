@@ -443,6 +443,18 @@ export default function Home(): React.ReactElement {
           next.delete(nodeId);
           return next;
         });
+      } else if (expression.includes('import [') || expression.includes('Monolith.')) {
+        // Hybrid JS - skip type checking
+        setTypeStatus((prev) => {
+          const next = new Map(prev);
+          next.set(nodeId, 'valid');
+          return next;
+        });
+        setTypeErrors((prev) => {
+          const next = new Map(prev);
+          next.delete(nodeId);
+          return next;
+        });
       } else {
         const result = parseAndTypeCheck(expression);
         if (result.ok) {
