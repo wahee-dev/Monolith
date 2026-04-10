@@ -4,6 +4,7 @@ import { LOGIC_NODE_DEFINITIONS } from './logic';
 import { TRANSFORM_NODE_DEFINITIONS } from './transform';
 import { IO_NODE_DEFINITIONS } from './io';
 import { FLOW_NODE_DEFINITIONS } from './flow';
+import { UI_NODE_DEFINITIONS } from './ui';
 
 export const ALL_NODE_DEFINITIONS: ReadonlyArray<NodeTypeDefinition> = [
   ...DATA_NODE_DEFINITIONS,
@@ -11,4 +12,5 @@ export const ALL_NODE_DEFINITIONS: ReadonlyArray<NodeTypeDefinition> = [
   ...TRANSFORM_NODE_DEFINITIONS,
   ...IO_NODE_DEFINITIONS,
   ...FLOW_NODE_DEFINITIONS,
+  ...UI_NODE_DEFINITIONS,
 ] as const;
