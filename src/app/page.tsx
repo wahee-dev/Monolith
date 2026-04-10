@@ -39,6 +39,8 @@ import { TemplateDropdown } from '@templates/TemplateDropdown';
 import type { Template } from '@templates/index';
 import { getTemplateById } from '@templates/index';
 import { getMonolithAPI } from '@engine/monolith-api';
+import { IDELayout } from '@ide/index';
+import type { IDEPanelState } from '@ide/index';
 
 const KIND_SCHEMAS: Record<LatticeNodeKind, NodeSchema> = {
   source: {
@@ -167,6 +169,12 @@ export default function Home(): React.ReactElement {
   const [errorMessage, setErrorMessage] = useState<string>('');
   const [executionResult, setExecutionResult] = useState<GraphExecutionResult | null>(null);
   const [showPreview, setShowPreview] = useState<boolean>(false);
+  const [idePanelState, setIdePanelState] = useState<IDEPanelState>({
+    isOpen: true,
+    leftWidth: 220,
+    rightWidth: 280,
+    showCodeEditor: true,
+  });
 
   const kindCounters = useRef<Map<string, number>>(new Map());
   const executionTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -894,6 +902,23 @@ export default function Home(): React.ReactElement {
         >
           PREVIEW
         </span>
+        <span
+          style={{
+            cursor: 'pointer',
+            color: idePanelState.isOpen || idePanelState.showCodeEditor ? '#00ffff' : '#666',
+            fontSize: '9px',
+            padding: '1px 6px',
+            border: `1px solid ${idePanelState.isOpen || idePanelState.showCodeEditor ? '#00ffff' : '#222'}`,
+            borderRadius: '3px',
+          }}
+          onClick={(): void => setIdePanelState((prev) => ({
+            ...prev,
+            isOpen: !prev.isOpen,
+            showCodeEditor: !prev.isOpen ? true : prev.showCodeEditor,
+          }))}
+        >
+          IDE
+        </span>
       </div>
 
       {errorMessage.length > 0 && (
@@ -928,7 +953,35 @@ export default function Home(): React.ReactElement {
           onAddNode={handleAddNode}
         />
 
-        <div style={{ flex: 1, position: 'relative', overflow: 'hidden' }}>
+        <IDELayout
+          latticeState={latticeState}
+          nodePositions={nodePositions}
+          expressions={expressions}
+          panelState={idePanelState}
+          selectedNodeId={selectedNodeId}
+          selectedEdgeId={selectedEdgeId}
+          editingNodeId={editingNodeId}
+          onToggleIDE={(): void => setIdePanelState((prev) => ({
+            ...prev,
+            isOpen: !prev.isOpen,
+            showCodeEditor: !prev.isOpen ? true : prev.showCodeEditor,
+          }))}
+          onToggleExpand={function (_id: string): void {}}
+          onTreeSelect={function (_selection: import("@ide/types").TreeSelection): void {}}
+          onCodeChange={function (_code: string): void {}}
+          onCodeSave={function (): void {}}
+          onCodeApply={function (): void {}}
+          onNodeSelect={handleNodeSelect}
+          onEdgeSelect={handleEdgeSelect}
+          onNodeMove={handleNodeMove}
+          onNodeDoubleClick={handleNodeDoubleClick}
+          onExpressionCommit={handleExpressionCommit}
+          onExpressionCancel={handleExpressionCancel}
+          onConnectionCreate={handleConnectionCreate}
+          onConnectionValidationError={handleConnectionValidationError}
+          onDeleteSelected={handleDeleteSelected}
+          onDeselect={handleDeselect}
+        >
           <MeshPage
             latticeState={latticeState}
             expressions={expressions}
@@ -954,7 +1007,7 @@ export default function Home(): React.ReactElement {
             onDeleteSelected={handleDeleteSelected}
             onDeselect={handleDeselect}
           />
-        </div>
+        </IDELayout>
 
         {showPreview && (
           <ShadowAppPanel
