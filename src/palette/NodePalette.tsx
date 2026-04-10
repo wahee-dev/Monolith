@@ -13,6 +13,7 @@ const CATEGORY_COLORS: Record<NodeCategory, string> = {
   io: '#4aff9f',
   flow: '#9fff4a',
   ui: '#ff4a9f',
+  state: '#4aafff',
 };
 
 const ALL_TABS: ReadonlyArray<NodeCategory | 'all'> = [
@@ -22,6 +23,7 @@ const ALL_TABS: ReadonlyArray<NodeCategory | 'all'> = [
   'transform',
   'io',
   'flow',
+  'state',
 ];
 
 interface NodePaletteProps {

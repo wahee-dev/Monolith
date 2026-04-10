@@ -588,7 +588,7 @@ export default function Home(): React.ReactElement {
     setPaletteState((prev) => ({ ...prev, searchQuery: query }));
   }, []);
 
-  const handlePaletteCategoryChange = useCallback((category: 'all' | 'data' | 'logic' | 'transform' | 'io' | 'ui' | 'flow'): void => {
+  const handlePaletteCategoryChange = useCallback((category: 'all' | 'data' | 'logic' | 'transform' | 'io' | 'ui' | 'flow' | 'state'): void => {
     setPaletteState((prev) => ({ ...prev, selectedCategory: category }));
   }, []);
 
