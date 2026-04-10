@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useState } from 'react';
-import { typecheckAllExpressions } from '@law/typecheck';
+import { typecheckNodeExpressions } from '@law/typecheck';
 import type { TypeCheckDiagnostic } from '@law/typecheck';
 
 export interface TypeCheckRunResult {
@@ -36,14 +36,19 @@ export function useTypeCheckGuard(): TypeCheckGuardResult {
         return emptyResult;
       }
 
-      const result = typecheckAllExpressions(expressions);
+      const result = typecheckNodeExpressions(expressions);
       const canExecute = result.allValid;
 
-      setDiagnostics(result.diagnostics);
+      const diagnosticsMap = new Map<string, TypeCheckDiagnostic>();
+      result.diagnostics.forEach((d) => {
+        diagnosticsMap.set(d.nodeId, d);
+      });
+
+      setDiagnostics(diagnosticsMap);
       setIsBlocking(!canExecute);
 
       return {
-        diagnostics: result.diagnostics,
+        diagnostics: diagnosticsMap,
         canExecute,
       };
     },

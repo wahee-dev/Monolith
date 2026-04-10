@@ -2,6 +2,8 @@ import type { LawResult, TypeCheckDiagnostic, PermissionToken, GovernanceLedger 
 import { parseAndTypeCheck } from '@lattice/expression';
 import { guard } from './guard';
 
+export type { TypeCheckDiagnostic };
+
 export interface NodeTypeCheckResult {
   readonly diagnostics: ReadonlyArray<TypeCheckDiagnostic>;
   readonly allValid: boolean;
@@ -25,11 +27,9 @@ export function typecheckExpression(source: string): LawResult<TypeCheckDiagnost
 
   return {
     ok: false,
-    value: {
-      nodeId: '',
-      expression: source,
-      isValid: false,
-      error: result.error.message,
+    error: {
+      code: 'TYPE_MISMATCH',
+      message: result.error.message,
     },
   };
 }

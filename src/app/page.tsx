@@ -247,13 +247,13 @@ export default function Home(): React.ReactElement {
       const newErrors = new Map<string, string>();
 
       for (const [nodeId, diag] of diagnostics) {
-        if (diag.source.trim().length === 0) {
+        if (diag.expression.trim().length === 0) {
           newStatus.set(nodeId, 'unchecked');
         } else if (diag.isValid) {
           newStatus.set(nodeId, 'valid');
         } else {
           newStatus.set(nodeId, 'invalid');
-          newErrors.set(nodeId, diag.error);
+          newErrors.set(nodeId, diag.error || '');
         }
       }
 
