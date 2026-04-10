@@ -1,93 +1,98 @@
-import type { LawResult } from './types';
+import type { LawResult, TypeCheckDiagnostic, PermissionToken, GovernanceLedger } from './types';
 import { parseAndTypeCheck } from '@lattice/expression';
+import { guard } from './guard';
 
-export interface TypeCheckDiagnostic {
-  readonly nodeId: string;
-  readonly source: string;
-  readonly isValid: boolean;
-  readonly error: string;
-}
-
-export interface AllNodesTypeCheckResult {
-  readonly diagnostics: ReadonlyMap<string, TypeCheckDiagnostic>;
+export interface NodeTypeCheckResult {
+  readonly diagnostics: ReadonlyArray<TypeCheckDiagnostic>;
   readonly allValid: boolean;
-  readonly invalidNodeIds: ReadonlyArray<string>;
+  readonly checkedAt: number;
 }
 
-export function typecheckExpression(
-  nodeId: string,
-  source: string,
-): TypeCheckDiagnostic {
-  if (source.trim().length === 0) {
-    return {
-      nodeId,
-      source,
-      isValid: true,
-      error: '',
-    };
-  }
-
+export function typecheckExpression(source: string): LawResult<TypeCheckDiagnostic> {
   const result = parseAndTypeCheck(source);
 
   if (result.ok) {
     return {
-      nodeId,
-      source,
-      isValid: true,
-      error: '',
+      ok: true,
+      value: {
+        nodeId: '',
+        expression: source,
+        isValid: true,
+        inferredType: result.value.expressionType,
+      },
     };
   }
 
   return {
-    nodeId,
-    source,
-    isValid: false,
-    error: result.error.message,
+    ok: false,
+    value: {
+      nodeId: '',
+      expression: source,
+      isValid: false,
+      error: result.error.message,
+    },
   };
 }
 
-export function typecheckAllExpressions(
+export function typecheckNodeExpressions(
   expressions: ReadonlyMap<string, string>,
-): AllNodesTypeCheckResult {
-  const diagnostics = new Map<string, TypeCheckDiagnostic>();
-  const invalidNodeIds: string[] = [];
+): NodeTypeCheckResult {
+  const diagnostics: Array<TypeCheckDiagnostic> = [];
 
-  for (const [nodeId, source] of expressions) {
-    const diagnostic = typecheckExpression(nodeId, source);
-    diagnostics.set(nodeId, diagnostic);
-    if (!diagnostic.isValid) {
-      invalidNodeIds.push(nodeId);
+  expressions.forEach((expression, nodeId) => {
+    const result = typecheckExpression(expression);
+    if (!result.ok) return;
+    if (result.value.isValid) {
+      diagnostics.push({
+        nodeId,
+        expression,
+        isValid: true,
+        ...(result.value.inferredType !== undefined ? { inferredType: result.value.inferredType } : {}),
+      });
+    } else {
+      diagnostics.push({
+        nodeId,
+        expression,
+        isValid: false,
+        ...(result.value.error !== undefined ? { error: result.value.error } : {}),
+      });
     }
-  }
+  });
+
+  const allValid = diagnostics.every((d) => d.isValid);
 
   return {
     diagnostics,
-    allValid: invalidNodeIds.length === 0,
-    invalidNodeIds,
+    allValid,
+    checkedAt: Date.now(),
   };
 }
 
 export function guardTypeCheck(
   expressions: ReadonlyMap<string, string>,
-): LawResult<AllNodesTypeCheckResult> {
-  const result = typecheckAllExpressions(expressions);
-
-  if (!result.allValid) {
-    const firstInvalid = result.invalidNodeIds[0];
-    const firstDiagnostic = firstInvalid !== undefined
-      ? result.diagnostics.get(firstInvalid)
-      : undefined;
-
-    return {
-      ok: false,
-      error: {
-        code: 'TYPE_MISMATCH',
-        message: firstDiagnostic !== undefined && firstDiagnostic.error.length > 0
-          ? `Type check failed: ${firstDiagnostic.error}`
-          : `Type check failed for ${result.invalidNodeIds.length} node(s)`,
-      },
-    };
+  token: PermissionToken | undefined,
+  ledger: GovernanceLedger,
+): LawResult<NodeTypeCheckResult> {
+  const authResult = guard('lattice:typecheck:validate', token, ledger);
+  if (!authResult.ok) {
+    return authResult;
   }
 
-  return { ok: true, value: result };
+  const result = typecheckNodeExpressions(expressions);
+
+  if (result.allValid) {
+    return { ok: true, value: result };
+  }
+
+  const invalidDiagnostics = result.diagnostics.filter((d) => !d.isValid);
+
+  return {
+    ok: false,
+    error: {
+      code: 'TYPE_MISMATCH',
+      message: `Type-check failed for ${invalidDiagnostics.length} expression(s)`,
+      capability: 'lattice:typecheck:validate',
+      diagnostics: invalidDiagnostics,
+    },
+  };
 }
