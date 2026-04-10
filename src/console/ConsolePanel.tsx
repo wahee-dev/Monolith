@@ -138,6 +138,13 @@ export function ConsolePanel({
     [onTabChange],
   );
 
+  const handleCopy = useCallback((): void => {
+    const text = filteredEntries
+      .map((e) => `[${e.type.toUpperCase()}] ${e.message}`)
+      .join('\n');
+    navigator.clipboard.writeText(text);
+  }, [filteredEntries]);
+
   if (consoleState.isCollapsed) {
     return (
       <div
@@ -260,6 +267,22 @@ export function ConsolePanel({
           ))}
         </div>
 
+        <button
+          type="button"
+          onClick={handleCopy}
+          style={{
+            backgroundColor: 'transparent',
+            border: 'none',
+            color: '#666',
+            cursor: 'pointer',
+            fontSize: '12px',
+            padding: '2px 6px',
+            fontFamily: 'monospace',
+          }}
+          title="Copy to clipboard"
+        >
+          &#128203;
+        </button>
         <button
           type="button"
           onClick={onClear}
