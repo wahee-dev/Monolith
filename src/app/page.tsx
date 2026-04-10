@@ -41,6 +41,8 @@ import { getTemplateById } from '@templates/index';
 import { getMonolithAPI } from '@engine/monolith-api';
 import { IDELayout } from '@ide/index';
 import type { IDEPanelState } from '@ide/index';
+import { ConsolePanel } from '@console/index';
+import type { ConsoleState, ConsoleTab, ConsoleEntry } from '@console/types';
 
 const KIND_SCHEMAS: Record<LatticeNodeKind, NodeSchema> = {
   source: {
@@ -179,6 +181,13 @@ export default function Home(): React.ReactElement {
   const [showRightPanel, setShowRightPanel] = useState<boolean>(false);
   const [showBottomPanel, setShowBottomPanel] = useState<boolean>(false);
   const [activeMenu, setActiveMenu] = useState<string | null>(null);
+  const [consoleState, setConsoleState] = useState<ConsoleState>({
+    isOpen: true,
+    isCollapsed: false,
+    activeTab: 'output',
+    height: 150,
+    entries: [],
+  });
 
   const kindCounters = useRef<Map<string, number>>(new Map());
   const executionTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -535,6 +544,24 @@ export default function Home(): React.ReactElement {
     }
   }, [historyState]);
 
+  const addConsoleEntry = useCallback(
+    (type: ConsoleEntry['type'], message: string, nodeId?: string, details?: string): void => {
+      const entry: ConsoleEntry = {
+        id: `console-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+        type,
+        message,
+        timestamp: Date.now(),
+        ...(nodeId !== undefined && { nodeId }),
+        ...(details !== undefined && { details }),
+      };
+      setConsoleState((prev) => ({
+        ...prev,
+        entries: [...prev.entries, entry],
+      }));
+    },
+    [],
+  );
+
   const handleRun = useCallback((): void => {
     const { diagnostics: runDiagnostics, canExecute } = typeCheckGuard.runTypeCheck(expressions);
     applyDiagnostics(runDiagnostics);
@@ -547,6 +574,12 @@ export default function Home(): React.ReactElement {
     if (graphValidation !== null && !graphValidation.isValid) {
       const errorMessages = graphValidation.errors.map((e) => e.message).join('; ');
       setErrorMessage(`Graph validation failed: ${errorMessages}`);
+      for (const err of graphValidation.errors) {
+        addConsoleEntry('error', err.message, err.nodeId);
+      }
+      for (const warn of graphValidation.warnings) {
+        addConsoleEntry('warning', warn.message, warn.nodeId);
+      }
       return;
     }
 
@@ -563,17 +596,22 @@ export default function Home(): React.ReactElement {
     const execResult = executeGraph(latticeState, expressions);
     if (execResult.ok) {
       setExecutionResult(execResult.value);
+      addConsoleEntry('success', `Execution completed in ${execResult.value.durationMs}ms`);
       const newState = { ...latticeState };
       const newValues = new Map(newState.values);
       for (const [nodeId, value] of execResult.value.outputs) {
         newValues.set(nodeId as LatticeNodeId, value);
       }
       setLatticeState({ ...newState, values: newValues, version: newState.version + 1 });
+      for (const traceItem of execResult.value.trace) {
+        addConsoleEntry('info', `${traceItem.nodeId}: executed`, traceItem.nodeId);
+      }
     } else {
       setErrorMessage(execResult.error.message);
+      addConsoleEntry('error', execResult.error.message);
       setExecutionResult(null);
     }
-  }, [expressions, typeCheckGuard, applyDiagnostics, graphValidation, latticeState]);
+  }, [expressions, typeCheckGuard, applyDiagnostics, graphValidation, latticeState, addConsoleEntry]);
 
   const handleStop = useCallback((): void => {
     if (executionTimerRef.current !== null) {
@@ -681,6 +719,26 @@ export default function Home(): React.ReactElement {
 
   const handleInspectorClose = useCallback((): void => {
     setSelectedNodeId(null);
+  }, []);
+
+  const handleConsoleTabChange = useCallback((tab: ConsoleTab): void => {
+    setConsoleState((prev) => ({ ...prev, activeTab: tab }));
+  }, []);
+
+  const handleConsoleToggleCollapse = useCallback((): void => {
+    setConsoleState((prev) => ({ ...prev, isCollapsed: !prev.isCollapsed }));
+  }, []);
+
+  const handleConsoleClear = useCallback((): void => {
+    setConsoleState((prev) => ({ ...prev, entries: [] }));
+  }, []);
+
+  const handleConsoleEntryClick = useCallback((nodeId: string): void => {
+    setSelectedNodeId(nodeId);
+  }, []);
+
+  const handleConsoleClose = useCallback((): void => {
+    setConsoleState((prev) => ({ ...prev, isOpen: false }));
   }, []);
 
   const handleNameComponent = useCallback(
@@ -1222,6 +1280,17 @@ export default function Home(): React.ReactElement {
           {expressions.size}exp v{latticeState.version}
         </span>
       </div>
+
+      {consoleState.isOpen && (
+        <ConsolePanel
+          consoleState={consoleState}
+          onTabChange={handleConsoleTabChange}
+          onToggleCollapse={handleConsoleToggleCollapse}
+          onClear={handleConsoleClear}
+          onEntryClick={handleConsoleEntryClick}
+          onClose={handleConsoleClose}
+        />
+      )}
     </div>
   );
 }
