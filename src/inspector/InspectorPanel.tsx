@@ -23,6 +23,7 @@ const CATEGORY_COLORS: Record<NodeCategory, string> = {
   io: '#4aff9f',
   ui: '#ff4a9f',
   flow: '#9fff4a',
+  state: '#4aafff',
 };
 
 function formatOutput(output: unknown): string {

@@ -1,5 +1,14 @@
 export type PortType = 'string' | 'number' | 'boolean' | 'object' | 'array' | 'any' | 'void';
 
+export interface PropertyDefinition {
+  readonly name: string;
+  readonly type: PortType;
+  readonly label: string;
+  readonly required: boolean;
+  readonly default?: unknown;
+  readonly options?: ReadonlyArray<string>;
+}
+
 export interface PortDefinition {
   readonly name: string;
   readonly type: PortType;
@@ -7,7 +16,7 @@ export interface PortDefinition {
   readonly required: boolean;
 }
 
-export type NodeCategory = 'data' | 'logic' | 'transform' | 'io' | 'ui' | 'flow';
+export type NodeCategory = 'data' | 'logic' | 'transform' | 'io' | 'ui' | 'flow' | 'state';
 
 export interface NodeTypeDefinition {
   readonly kind: string;
@@ -16,6 +25,7 @@ export interface NodeTypeDefinition {
   readonly description: string;
   readonly inputs: ReadonlyArray<PortDefinition>;
   readonly outputs: ReadonlyArray<PortDefinition>;
+  readonly properties?: ReadonlyArray<PropertyDefinition>;
   readonly editableSchema: boolean;
 }
 
