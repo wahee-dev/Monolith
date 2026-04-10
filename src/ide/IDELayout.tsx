@@ -31,6 +31,8 @@ interface IDELayoutProps {
   onConnectionValidationError: (fromType: PortType, toType: PortType) => void;
   onDeleteSelected: () => void;
   onDeselect: () => void;
+  expandedNodes?: Set<string>;
+  onReorder?: (nodeId: string, newParentId: string, index: number) => void;
   children?: React.ReactNode;
 }
 
@@ -108,6 +110,8 @@ export function IDELayout({
   onCodeApply,
   onNodeSelect,
   children,
+  expandedNodes,
+  onReorder,
 }: IDELayoutProps): React.ReactElement {
   const [selectedTreeId, setSelectedTreeId] = useState<string | null>(selectedNodeId);
   const [currentCode, setCurrentCode] = useState<string>('');
@@ -174,6 +178,8 @@ export function IDELayout({
             onAddNode={function (_pageId: string, _componentId: string): void {}}
             onDelete={function (_id: string, _type: 'page' | 'component' | 'node'): void {}}
             onRename={function (_id: string, _newName: string): void {}}
+            onReorder={onReorder ?? function (_nodeId: string, _newParentId: string, _index: number): void {}}
+            expandedNodes={expandedNodes ?? new Set()}
           />
         </div>
       )}
