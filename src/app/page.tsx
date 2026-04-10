@@ -41,6 +41,9 @@ import { getTemplateById } from '@templates/index';
 import { getMonolithAPI } from '@engine/monolith-api';
 import { IDELayout } from '@ide/index';
 import type { IDEPanelState } from '@ide/index';
+import { AISidebar } from '@ai/index';
+import { executeTool } from '@ai/aiTools';
+import type { ToolExecutorContext } from '@ai/aiTools';
 
 const KIND_SCHEMAS: Record<LatticeNodeKind, NodeSchema> = {
   source: {
@@ -175,6 +178,8 @@ export default function Home(): React.ReactElement {
     rightWidth: 280,
     showCodeEditor: true,
   });
+  const [showAI, setShowAI] = useState<boolean>(false);
+  const [aiProjectContext, setAiProjectContext] = useState<string>('');
 
   const kindCounters = useRef<Map<string, number>>(new Map());
   const executionTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -344,6 +349,175 @@ export default function Home(): React.ReactElement {
       if (starter !== undefined) loadTemplate(starter);
     }
   }, [latticeState.nodes.size, loadTemplate]);
+
+  const generateProjectContext = useCallback((): string => {
+    const nodeList: string[] = [];
+    for (const [id, node] of latticeState.nodes) {
+      const expr = expressions.get(id as string) ?? '';
+      const pos = nodePositions.get(id as string);
+      nodeList.push(`- ${node.kind} node "${id as string}" at (${pos?.x ?? 0}, ${pos?.y ?? 0}): "${expr}"`);
+    }
+    const connList: string[] = [];
+    for (let i = 0; i < latticeState.connections.length; i++) {
+      const conn = latticeState.connections[i]!;
+      connList.push(`- ${conn.from as string}[${conn.fromPort}] -> ${conn.to as string}[${conn.toPort}]`);
+    }
+    const context = `Pages: 1 (main)\nNodes:\n${nodeList.join('\n')}\n\nConnections:\n${connList.join('\n')}\n\nStatus: ${latticeState.status}`;
+    return context;
+  }, [latticeState, expressions, nodePositions]);
+
+  useEffect(() => {
+    setAiProjectContext(generateProjectContext());
+  }, [generateProjectContext]);
+
+  const aiToolContext: ToolExecutorContext = useMemo((): ToolExecutorContext => ({
+    getPages: () => ['main'],
+    getPage: (name: string) => name === 'main' ? aiProjectContext : null,
+    getNodes: () => Array.from(latticeState.nodes.keys()).map(k => k as string),
+    getNode: (id: string) => {
+      const node = latticeState.nodes.get(id as LatticeNodeId);
+      const expr = expressions.get(id) ?? '';
+      const pos = nodePositions.get(id);
+      return node ? { ...node, expression: expr, position: pos } : null;
+    },
+    getConnections: () => latticeState.connections.map(c => c.id),
+    getProjectState: () => ({ latticeState, expressions: Object.fromEntries(expressions), positions: Object.fromEntries(nodePositions) }),
+    addNode: (kind: string, x?: number, y?: number, _name?: string) => {
+      const latticeKind = kind as LatticeNodeKind;
+      const currentCount = kindCounters.current.get(kind) ?? 0;
+      const nextCount = currentCount + 1;
+      kindCounters.current.set(kind, nextCount);
+      const id = createLatticeNodeId(`${kind}-${nextCount}-${Date.now()}`);
+      const schema = getSchemaForKind(latticeKind);
+      const newNode: LatticeNode = { id, kind: latticeKind, schema };
+      const posX = x ?? (200 + Math.random() * 200);
+      const posY = y ?? (100 + Math.random() * 200);
+      setNodePositions(prev => { const next = new Map(prev); next.set(id as string, { x: posX, y: posY }); return next; });
+      setLatticeState(prev => addNode(prev, newNode));
+      pushToHistory('Add node via AI');
+      return id as string;
+    },
+    deleteNode: (nodeId: string) => {
+      setNodePositions(prev => { const next = new Map(prev); next.delete(nodeId); return next; });
+      setExpressions(prev => { const next = new Map(prev); next.delete(nodeId); return next; });
+      setLatticeState(prev => removeNode(prev, nodeId as LatticeNodeId));
+      pushToHistory('Delete node via AI');
+      return true;
+    },
+    setNodePosition: (nodeId: string, x: number, y: number) => {
+      setNodePositions(prev => { const next = new Map(prev); next.set(nodeId, { x, y }); return next; });
+      pushToHistory('Move node via AI');
+      return true;
+    },
+    setNodeExpression: (nodeId: string, expression: string) => {
+      setExpressions(prev => { const next = new Map(prev); next.set(nodeId, expression); return next; });
+      pushToHistory('Edit expression via AI');
+      return true;
+    },
+    addConnection: (fromNode: string, fromPort: string, toNode: string, toPort: string) => {
+      const connId = `conn-${Date.now()}`;
+      const newConn: LatticeConnection = { id: connId, from: createLatticeNodeId(fromNode), to: createLatticeNodeId(toNode), fromPort, toPort };
+      setLatticeState(prev => addConnection(prev, newConn));
+      pushToHistory('Create connection via AI');
+      return connId;
+    },
+    deleteConnection: (connectionId: string) => {
+      setLatticeState(prev => removeConnection(prev, connectionId));
+      pushToHistory('Delete connection via AI');
+      return true;
+    },
+    createPage: (_name: string) => false,
+    deletePage: (_name: string) => false,
+    navigateTo: (_pageName: string) => false,
+    createComponent: (name: string) => {
+      if (selectedNodeId !== null) {
+        const Monolith = getMonolithAPI();
+        const selectedNode = latticeState.nodes.get(selectedNodeId as LatticeNodeId);
+        if (selectedNode) {
+          Monolith.registerComponent(name, { nodes: new Map([[selectedNodeId as LatticeNodeId, selectedNode]]), connections: [], positions: new Map([[selectedNodeId, nodePositions.get(selectedNodeId) ?? {x:0,y:0}]]) });
+          Monolith.notify(`Component "${name}" registered!`, 'success');
+          return true;
+        }
+      }
+      return false;
+    },
+    renameComponent: (_oldName: string, _newName: string) => false,
+    setGlobalState: (_key: string, _value: unknown) => {},
+    getGlobalState: (_key: string) => null,
+    run: () => {
+      const { diagnostics: runDiagnostics, canExecute } = typeCheckGuard.runTypeCheck(expressions);
+      applyDiagnostics(runDiagnostics);
+      if (!canExecute) { setErrorMessage('Execution blocked: type check errors detected'); return false; }
+      if (graphValidation !== null && !graphValidation.isValid) { setErrorMessage(`Graph validation failed: ${graphValidation.errors.map((e) => e.message).join('; ')}`); return false; }
+      setErrorMessage('');
+      const startResult = startExecution(latticeState);
+      if (!startResult.ok) { setErrorMessage(startResult.error.message); return false; }
+      setExecutionState(startResult.value);
+      const execResult = executeGraph(latticeState, expressions);
+      if (execResult.ok) {
+        setExecutionResult(execResult.value);
+        const newState = { ...latticeState };
+        const newValues = new Map(newState.values);
+        for (const [nodeId, value] of execResult.value.outputs) { newValues.set(nodeId as LatticeNodeId, value); }
+        setLatticeState({ ...newState, values: newValues, version: newState.version + 1 });
+      } else { setErrorMessage(execResult.error.message); setExecutionResult(null); }
+      return true;
+    },
+    stop: () => {
+      if (executionTimerRef.current !== null) { clearInterval(executionTimerRef.current); executionTimerRef.current = null; }
+      setExecutionState(resetExecution(executionState));
+      typeCheckGuard.clearBlock();
+    },
+    selectNode: (nodeId: string) => { setSelectedNodeId(nodeId); },
+    focusPanel: (panelName: string) => {
+      if (panelName === 'palette') setPaletteState(prev => ({ ...prev, isOpen: true }));
+      else if (panelName === 'preview') setShowPreview(true);
+      else if (panelName === 'ide') setIdePanelState(prev => ({ ...prev, isOpen: true }));
+    },
+    toggleAI: () => { setShowAI(prev => !prev); },
+  }), [
+    latticeState,
+    expressions,
+    nodePositions,
+    selectedNodeId,
+    nodePositions,
+    pushToHistory,
+    typeCheckGuard,
+    applyDiagnostics,
+    graphValidation,
+    startExecution,
+    executeGraph,
+    setExecutionState,
+    setExecutionResult,
+    setLatticeState,
+    typeCheckGuard.clearBlock,
+    resetExecution,
+    executionState,
+    setErrorMessage,
+  ]);
+
+  const handleAIRun = useCallback(async (message: string): Promise<string> => {
+    const response = await fetch('/api/ai', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ messages: [{ role: 'user', content: message }] }),
+    });
+    if (!response.ok) {
+      const err = await response.json();
+      return `Error: ${err.error ?? 'Unknown error'}`;
+    }
+    const data = await response.json();
+    if (data.toolCalls && data.toolCalls.length > 0) {
+      const toolResults: string[] = [];
+      for (let i = 0; i < data.toolCalls.length; i++) {
+        const tc = data.toolCalls[i]!;
+        const result = executeTool(tc.name, tc.arguments as Record<string, unknown>, aiToolContext);
+        toolResults.push(result);
+      }
+      return `Executed ${data.toolCalls.length} tool(s). Results:\n${toolResults.join('\n')}`;
+    }
+    return data.content ?? 'No response';
+  }, [aiToolContext]);
 
   const handleDeleteSelected = useCallback((): void => {
     if (selectedNodeId !== null) {
@@ -919,6 +1093,19 @@ export default function Home(): React.ReactElement {
         >
           IDE
         </span>
+        <span
+          style={{
+            cursor: 'pointer',
+            color: showAI ? '#4a9eff' : '#666',
+            fontSize: '9px',
+            padding: '1px 6px',
+            border: `1px solid ${showAI ? '#4a9eff' : '#222'}`,
+            borderRadius: '3px',
+          }}
+          onClick={(): void => setShowAI(!showAI)}
+        >
+          AI
+        </span>
       </div>
 
       {errorMessage.length > 0 && (
@@ -1023,6 +1210,13 @@ export default function Home(): React.ReactElement {
           onSchemaChange={handleInspectorSchemaChange}
           onClose={handleInspectorClose}
           onNameComponent={handleNameComponent}
+        />
+
+        <AISidebar
+          isOpen={showAI}
+          onToggle={(): void => setShowAI(!showAI)}
+          onRun={handleAIRun}
+          projectContext={aiProjectContext}
         />
       </div>
 
