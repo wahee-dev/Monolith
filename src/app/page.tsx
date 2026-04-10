@@ -170,11 +170,15 @@ export default function Home(): React.ReactElement {
   const [executionResult, setExecutionResult] = useState<GraphExecutionResult | null>(null);
   const [showPreview, setShowPreview] = useState<boolean>(false);
   const [idePanelState, setIdePanelState] = useState<IDEPanelState>({
-    isOpen: true,
+    isOpen: false,
     leftWidth: 220,
     rightWidth: 280,
-    showCodeEditor: true,
+    showCodeEditor: false,
   });
+  const [showLeftPanel, setShowLeftPanel] = useState<boolean>(false);
+  const [showRightPanel, setShowRightPanel] = useState<boolean>(false);
+  const [showBottomPanel, setShowBottomPanel] = useState<boolean>(false);
+  const [activeMenu, setActiveMenu] = useState<string | null>(null);
 
   const kindCounters = useRef<Map<string, number>>(new Map());
   const executionTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -584,6 +588,70 @@ export default function Home(): React.ReactElement {
     setPaletteState((prev) => ({ ...prev, isOpen: !prev.isOpen }));
   }, []);
 
+  const handleToggleLeftPanel = useCallback((): void => {
+    setShowLeftPanel((prev) => !prev);
+  }, []);
+
+  const handleToggleRightPanel = useCallback((): void => {
+    setShowRightPanel((prev) => !prev);
+  }, []);
+
+  const handleToggleBottomPanel = useCallback((): void => {
+    setShowBottomPanel((prev) => !prev);
+  }, []);
+
+  const handleMenuClick = useCallback((menu: string): void => {
+    setActiveMenu((prev) => (prev === menu ? null : menu));
+  }, []);
+
+  const handleMenuAction = useCallback((action: string): void => {
+    setActiveMenu(null);
+    switch (action) {
+      case 'new':
+        pushToHistory('New project');
+        setLatticeState({ nodes: new Map(), connections: [], values: new Map(), status: 'idle', version: 1 });
+        setNodePositions(new Map());
+        setExpressions(new Map());
+        setSelectedNodeId(null);
+        setSelectedEdgeId(null);
+        break;
+      case 'save':
+        getMonolithAPI().notify('Project saved!', 'success');
+        break;
+      case 'undo':
+        handleUndo();
+        break;
+      case 'redo':
+        handleRedo();
+        break;
+      case 'run':
+        handleRun();
+        break;
+      case 'stop':
+        handleStop();
+        break;
+      case 'toggleLeft':
+        handleToggleLeftPanel();
+        break;
+      case 'toggleRight':
+        handleToggleRightPanel();
+        break;
+      case 'toggleBottom':
+        handleToggleBottomPanel();
+        break;
+      case 'togglePreview':
+        setShowPreview((prev) => !prev);
+        break;
+      case 'toggleIDE':
+        setIdePanelState((prev) => ({
+          ...prev,
+          isOpen: !prev.isOpen,
+          showCodeEditor: !prev.isOpen ? true : prev.showCodeEditor,
+        }));
+        break;
+    }
+  }, [pushToHistory, handleUndo, handleRedo, handleRun, handleStop, handleToggleLeftPanel, handleToggleRightPanel, handleToggleBottomPanel]);
+
   const handlePaletteSearchChange = useCallback((query: string): void => {
     setPaletteState((prev) => ({ ...prev, searchQuery: query }));
   }, []);
@@ -781,42 +849,119 @@ export default function Home(): React.ReactElement {
       height: '100vh',
       display: 'flex',
       flexDirection: 'column',
-      backgroundColor: '#08080f',
+      backgroundColor: '#1a1a1a',
       overflow: 'hidden',
       fontFamily: 'monospace',
     }}>
       <div style={{
         display: 'flex',
         alignItems: 'center',
-        gap: '6px',
-        height: '44px',
-        padding: '0 12px',
-        backgroundColor: '#0c0c14',
-        borderBottom: '1px solid #1a1a2e',
-        fontSize: '11px',
-        color: '#888888',
+        height: '32px',
+        padding: '0 8px',
+        backgroundColor: '#252525',
+        borderBottom: '1px solid #333333',
+        fontSize: '12px',
+        color: '#e0e0e0',
         zIndex: 10,
         flexShrink: 0,
       }}>
-        <span
-          style={{ cursor: 'pointer', color: paletteState.isOpen ? '#00ffff' : '#aaaaaa', fontSize: '14px', lineHeight: 1 }}
-          onClick={handleTogglePalette}
-          title="Toggle Palette (Space)"
-        >
-          &#9776;
-        </span>
-        <span style={{ width: '1px', height: '16px', backgroundColor: '#1a1a2e' }} />
-        <span style={{ color: '#4a9eff', fontWeight: 'bold', fontSize: '16px', letterSpacing: '1px' }}>MONOLITH</span>
-        <span style={{ width: '1px', height: '16px', backgroundColor: '#1a1a2e' }} />
+        <div style={{ position: 'relative' }}>
+          <span
+            style={{ cursor: 'pointer', padding: '4px 8px', borderRadius: '3px', backgroundColor: activeMenu === 'file' ? '#3a3a3a' : 'transparent' }}
+            onClick={(): void => handleMenuClick('file')}
+          >
+            File
+          </span>
+          {activeMenu === 'file' && (
+            <div style={{ position: 'absolute', top: '100%', left: 0, backgroundColor: '#252525', border: '1px solid #333333', borderRadius: '4px', padding: '4px 0', minWidth: '150px', boxShadow: '0 4px 12px rgba(0,0,0,0.5)' }}>
+              <div style={{ padding: '6px 16px', cursor: 'pointer', color: '#e0e0e0' }} onClick={(): void => handleMenuAction('new')}>New Project</div>
+              <div style={{ padding: '6px 16px', cursor: 'pointer', color: '#e0e0e0' }} onClick={(): void => handleMenuAction('save')}>Save</div>
+              <div style={{ height: '1px', backgroundColor: '#333333', margin: '4px 0' }} />
+              <div style={{ padding: '6px 16px', cursor: 'pointer', color: '#888888' }}>Export</div>
+            </div>
+          )}
+        </div>
+        <div style={{ position: 'relative' }}>
+          <span
+            style={{ cursor: 'pointer', padding: '4px 8px', borderRadius: '3px', backgroundColor: activeMenu === 'edit' ? '#3a3a3a' : 'transparent' }}
+            onClick={(): void => handleMenuClick('edit')}
+          >
+            Edit
+          </span>
+          {activeMenu === 'edit' && (
+            <div style={{ position: 'absolute', top: '100%', left: 0, backgroundColor: '#252525', border: '1px solid #333333', borderRadius: '4px', padding: '4px 0', minWidth: '150px', boxShadow: '0 4px 12px rgba(0,0,0,0.5)' }}>
+              <div style={{ padding: '6px 16px', cursor: 'pointer', color: historyCanUndo(historyState) ? '#e0e0e0' : '#555555' }} onClick={(): void => handleMenuAction('undo')}>Undo</div>
+              <div style={{ padding: '6px 16px', cursor: 'pointer', color: historyCanRedo(historyState) ? '#e0e0e0' : '#555555' }} onClick={(): void => handleMenuAction('redo')}>Redo</div>
+            </div>
+          )}
+        </div>
+        <div style={{ position: 'relative' }}>
+          <span
+            style={{ cursor: 'pointer', padding: '4px 8px', borderRadius: '3px', backgroundColor: activeMenu === 'view' ? '#3a3a3a' : 'transparent' }}
+            onClick={(): void => handleMenuClick('view')}
+          >
+            View
+          </span>
+          {activeMenu === 'view' && (
+            <div style={{ position: 'absolute', top: '100%', left: 0, backgroundColor: '#252525', border: '1px solid #333333', borderRadius: '4px', padding: '4px 0', minWidth: '180px', boxShadow: '0 4px 12px rgba(0,0,0,0.5)' }}>
+              <div style={{ padding: '6px 16px', cursor: 'pointer', color: showLeftPanel ? '#4a9eff' : '#e0e0e0' }} onClick={(): void => handleMenuAction('toggleLeft')}>Left Panel {showLeftPanel ? '✓' : ''}</div>
+              <div style={{ padding: '6px 16px', cursor: 'pointer', color: showRightPanel ? '#4a9eff' : '#e0e0e0' }} onClick={(): void => handleMenuAction('toggleRight')}>Right Panel {showRightPanel ? '✓' : ''}</div>
+              <div style={{ padding: '6px 16px', cursor: 'pointer', color: showBottomPanel ? '#4a9eff' : '#e0e0e0' }} onClick={(): void => handleMenuAction('toggleBottom')}>Bottom Panel {showBottomPanel ? '✓' : ''}</div>
+              <div style={{ height: '1px', backgroundColor: '#333333', margin: '4px 0' }} />
+              <div style={{ padding: '6px 16px', cursor: 'pointer', color: showPreview ? '#4a9eff' : '#e0e0e0' }} onClick={(): void => handleMenuAction('togglePreview')}>Preview {showPreview ? '✓' : ''}</div>
+              <div style={{ padding: '6px 16px', cursor: 'pointer', color: idePanelState.isOpen ? '#4a9eff' : '#e0e0e0' }} onClick={(): void => handleMenuAction('toggleIDE')}>Code Editor {idePanelState.isOpen ? '✓' : ''}</div>
+            </div>
+          )}
+        </div>
+        <div style={{ position: 'relative' }}>
+          <span
+            style={{ cursor: 'pointer', padding: '4px 8px', borderRadius: '3px', backgroundColor: activeMenu === 'run' ? '#3a3a3a' : 'transparent' }}
+            onClick={(): void => handleMenuClick('run')}
+          >
+            Run
+          </span>
+          {activeMenu === 'run' && (
+            <div style={{ position: 'absolute', top: '100%', left: 0, backgroundColor: '#252525', border: '1px solid #333333', borderRadius: '4px', padding: '4px 0', minWidth: '150px', boxShadow: '0 4px 12px rgba(0,0,0,0.5)' }}>
+              {executionState.mode === 'running' || executionState.mode === 'stepping' ? (
+                <div style={{ padding: '6px 16px', cursor: 'pointer', color: '#f59e0b' }} onClick={(): void => handleMenuAction('stop')}>■ Stop</div>
+              ) : (
+                <div style={{ padding: '6px 16px', cursor: 'pointer', color: errorCount > 0 ? '#ef4444' : '#4aff9f' }} onClick={(): void => handleMenuAction('run')}>▶ Run</div>
+              )}
+            </div>
+          )}
+        </div>
+        <div style={{ position: 'relative' }}>
+          <span
+            style={{ cursor: 'pointer', padding: '4px 8px', borderRadius: '3px', backgroundColor: activeMenu === 'help' ? '#3a3a3a' : 'transparent' }}
+            onClick={(): void => handleMenuClick('help')}
+          >
+            Help
+          </span>
+          {activeMenu === 'help' && (
+            <div style={{ position: 'absolute', top: '100%', left: 0, backgroundColor: '#252525', border: '1px solid #333333', borderRadius: '4px', padding: '4px 0', minWidth: '150px', boxShadow: '0 4px 12px rgba(0,0,0,0.5)' }}>
+              <div style={{ padding: '6px 16px', cursor: 'pointer', color: '#888888' }}>Documentation</div>
+              <div style={{ padding: '6px 16px', cursor: 'pointer', color: '#888888' }}>About</div>
+            </div>
+          )}
+        </div>
+
+        <span style={{ flex: 1 }} />
+
+        <span style={{ color: '#4a9eff', fontWeight: 'bold', fontSize: '13px', letterSpacing: '1px' }}>MONOLITH</span>
+
+        <span style={{ flex: 1 }} />
+
         <TemplateDropdown onSelect={loadTemplate} />
-        <span style={{ width: '1px', height: '16px', backgroundColor: '#1a1a2e' }} />
+
+        <span style={{ width: '1px', height: '16px', backgroundColor: '#333333', margin: '0 12px' }} />
+
         {executionState.mode === 'running' || executionState.mode === 'stepping' ? (
           <span
             style={{
               cursor: 'pointer',
               color: '#f59e0b',
               fontWeight: 'bold',
-              padding: '1px 8px',
+              padding: '2px 10px',
               border: '1px solid #f59e0b',
               borderRadius: '3px',
               fontSize: '10px',
@@ -824,101 +969,71 @@ export default function Home(): React.ReactElement {
             onClick={handleStop}
             title="Stop (Ctrl+.)"
           >
-            &#9632; STOP
+            ■ STOP
           </span>
         ) : (
           <span
             style={{
               cursor: 'pointer',
-              color: errorCount > 0 ? '#ef4444' : '#22c55e',
+              color: errorCount > 0 ? '#ef4444' : '#4aff9f',
               fontWeight: 'bold',
-              padding: '1px 8px',
-              border: `1px solid ${errorCount > 0 ? '#ef4444' : '#22c55e'}`,
+              padding: '2px 10px',
+              border: `1px solid ${errorCount > 0 ? '#ef4444' : '#4aff9f'}`,
               borderRadius: '3px',
               fontSize: '10px',
             }}
             onClick={handleRun}
             title="Run (Ctrl+Enter)"
           >
-            &#9654; RUN
+            ▶ RUN
           </span>
         )}
+
+        <span style={{ width: '1px', height: '16px', backgroundColor: '#333333', margin: '0 12px' }} />
+
         <span
           style={{
-            cursor: historyCanUndo(historyState) ? 'pointer' : 'default',
-            color: historyCanUndo(historyState) ? '#aaaaaa' : '#444444',
-            padding: '0 2px',
+            cursor: 'pointer',
+            color: showLeftPanel ? '#4a9eff' : '#888888',
+            fontSize: '14px',
+            padding: '2px 6px',
           }}
-          onClick={handleUndo}
-          title="Undo (Ctrl+Z)"
+          onClick={handleToggleLeftPanel}
+          title="Toggle Left Panel"
         >
-          &#8630;
+          ☰
         </span>
         <span
           style={{
-            cursor: historyCanRedo(historyState) ? 'pointer' : 'default',
-            color: historyCanRedo(historyState) ? '#aaaaaa' : '#444444',
-            padding: '0 2px',
+            cursor: 'pointer',
+            color: showRightPanel ? '#4a9eff' : '#888888',
+            fontSize: '14px',
+            padding: '2px 6px',
           }}
-          onClick={handleRedo}
-          title="Redo (Ctrl+Shift+Z)"
+          onClick={handleToggleRightPanel}
+          title="Toggle Right Panel"
         >
-          &#8631;
+          🔍
         </span>
-        <span style={{ width: '1px', height: '16px', backgroundColor: '#1a1a2e' }} />
-        <div style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: '3px',
-        }}>
-          <div style={{
-            width: '6px',
-            height: '6px',
-            borderRadius: '50%',
-            backgroundColor: statusColor,
-            boxShadow: executionState.mode === 'running' ? '0 0 4px #22c55e' : 'none',
-          }} />
-          <span style={{ color: statusColor, fontWeight: 'bold', fontSize: '9px' }}>{statusLabel}</span>
+        <span
+          style={{
+            cursor: 'pointer',
+            color: showBottomPanel ? '#4a9eff' : '#888888',
+            fontSize: '14px',
+            padding: '2px 6px',
+          }}
+          onClick={handleToggleBottomPanel}
+          title="Toggle Bottom Panel"
+        >
+          ⌄
+        </span>
+
+        <span style={{ width: '1px', height: '16px', backgroundColor: '#333333', margin: '0 12px' }} />
+
+        <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+          <div style={{ width: '6px', height: '6px', borderRadius: '50%', backgroundColor: statusColor, boxShadow: executionState.mode === 'running' ? '0 0 4px #4aff9f' : 'none' }} />
+          <span style={{ color: statusColor, fontWeight: 'bold', fontSize: '10px' }}>{statusLabel}</span>
         </div>
-        <span style={{ color: '#666', fontSize: '10px' }}>
-          {latticeState.nodes.size}n
-        </span>
-        {executionResult !== null && (
-          <span style={{ color: '#666', fontSize: '9px' }}>
-            {executionResult.durationMs}ms
-          </span>
-        )}
-        <span
-          style={{
-            marginLeft: 'auto',
-            cursor: 'pointer',
-            color: showPreview ? '#00ffff' : '#666',
-            fontSize: '9px',
-            padding: '1px 6px',
-            border: `1px solid ${showPreview ? '#00ffff' : '#222'}`,
-            borderRadius: '3px',
-          }}
-          onClick={(): void => setShowPreview(!showPreview)}
-        >
-          PREVIEW
-        </span>
-        <span
-          style={{
-            cursor: 'pointer',
-            color: idePanelState.isOpen || idePanelState.showCodeEditor ? '#00ffff' : '#666',
-            fontSize: '9px',
-            padding: '1px 6px',
-            border: `1px solid ${idePanelState.isOpen || idePanelState.showCodeEditor ? '#00ffff' : '#222'}`,
-            borderRadius: '3px',
-          }}
-          onClick={(): void => setIdePanelState((prev) => ({
-            ...prev,
-            isOpen: !prev.isOpen,
-            showCodeEditor: !prev.isOpen ? true : prev.showCodeEditor,
-          }))}
-        >
-          IDE
-        </span>
       </div>
 
       {errorMessage.length > 0 && (
@@ -944,14 +1059,26 @@ export default function Home(): React.ReactElement {
         </div>
       )}
 
-      <div style={{ flex: 1, display: 'flex', overflow: 'hidden' }}>
-        <NodePalette
-          paletteState={paletteState}
-          onToggle={handleTogglePalette}
-          onSearchChange={handlePaletteSearchChange}
-          onCategoryChange={handlePaletteCategoryChange}
-          onAddNode={handleAddNode}
-        />
+      <div style={{ flex: 1, display: 'flex', overflow: 'hidden', position: 'relative' }}>
+        <div style={{
+          width: showLeftPanel ? '220px' : '0px',
+          overflow: 'hidden',
+          transition: 'width 0.2s ease',
+          flexShrink: 0,
+          backgroundColor: '#252525',
+          borderRight: showLeftPanel ? '1px solid #333333' : 'none',
+          borderRadius: showLeftPanel ? '0 4px 4px 0' : '0',
+        }}>
+          {showLeftPanel && (
+            <NodePalette
+              paletteState={paletteState}
+              onToggle={handleTogglePalette}
+              onSearchChange={handlePaletteSearchChange}
+              onCategoryChange={handlePaletteCategoryChange}
+              onAddNode={handleAddNode}
+            />
+          )}
+        </div>
 
         <IDELayout
           latticeState={latticeState}
@@ -1016,27 +1143,40 @@ export default function Home(): React.ReactElement {
           />
         )}
 
-        <InspectorPanel
-          inspectorState={inspectorState}
-          onExpressionChange={handleInspectorExpressionChange}
-          onExpressionCommit={handleInspectorExpressionCommit}
-          onSchemaChange={handleInspectorSchemaChange}
-          onClose={handleInspectorClose}
-          onNameComponent={handleNameComponent}
-        />
+        <div style={{
+          width: showRightPanel ? '280px' : '0px',
+          overflow: 'hidden',
+          transition: 'width 0.2s ease',
+          flexShrink: 0,
+          backgroundColor: '#252525',
+          borderLeft: showRightPanel ? '1px solid #333333' : 'none',
+          borderRadius: showRightPanel ? '4px 0 0 4px' : '0',
+        }}>
+          {showRightPanel && (
+            <InspectorPanel
+              inspectorState={inspectorState}
+              onExpressionChange={handleInspectorExpressionChange}
+              onExpressionCommit={handleInspectorExpressionCommit}
+              onSchemaChange={handleInspectorSchemaChange}
+              onClose={handleInspectorClose}
+              onNameComponent={handleNameComponent}
+            />
+          )}
+        </div>
       </div>
 
       <div style={{
-        display: 'flex',
+        display: showBottomPanel ? 'flex' : 'none',
         alignItems: 'center',
         gap: '4px',
         height: '28px',
         padding: '0 12px',
-        backgroundColor: '#111',
-        borderTop: '1px solid #1a1a2e',
+        backgroundColor: '#252525',
+        borderTop: '1px solid #333333',
         fontSize: '11px',
         color: '#888888',
         flexShrink: 0,
+        transition: 'display 0.2s ease',
       }}>
         <div style={{
           width: '6px',
