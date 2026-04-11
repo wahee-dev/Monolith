@@ -76,6 +76,7 @@ function TreeNodeComponent({
 }: TreeNodeProps): React.ReactElement {
   const [isRenaming, setIsRenaming] = useState(false);
   const [renameValue, setRenameValue] = useState(node.name);
+  const [isHovered, setIsHovered] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
   const isSelected = selectedId === node.id;
@@ -83,6 +84,12 @@ function TreeNodeComponent({
   const isExpanded = expandedNodes.has(node.id);
   const indent = depth * 16;
   const rowHeight = 32;
+
+  const backgroundColor = isSelected
+    ? 'rgba(74, 158, 255, 0.2)'
+    : isHovered
+    ? '#333333'
+    : 'transparent';
 
   useEffect(() => {
     if (isRenaming && inputRef.current) {
@@ -145,13 +152,15 @@ function TreeNodeComponent({
   return (
     <div>
       <div
+        onMouseEnter={(): void => setIsHovered(true)}
+        onMouseLeave={(): void => setIsHovered(false)}
         style={{
           display: 'flex',
           alignItems: 'center',
           height: rowHeight,
           paddingLeft: `${indent + 8}px`,
           cursor: 'pointer',
-          backgroundColor: isSelected ? 'rgba(74, 158, 255, 0.2)' : 'transparent',
+          backgroundColor,
           borderRadius: '3px',
           fontSize: '11px',
           color: isSelected ? '#4a9eff' : '#aaaaaa',
