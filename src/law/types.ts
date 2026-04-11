@@ -30,6 +30,7 @@ export interface LedgerEntry {
 export interface GovernanceLedger {
   readonly entries: ReadonlyArray<LedgerEntry>;
   readonly currentHash: string;
+  readonly version?: number;
 }
 
 export type LawResult<T> =
@@ -46,7 +47,8 @@ export interface LawError {
 export interface TypeCheckDiagnostic {
   readonly nodeId: string;
   readonly expression: string;
+  readonly source: string;
   readonly isValid: boolean;
-  readonly error?: string;
+  readonly error: string;
   readonly inferredType?: string;
 }

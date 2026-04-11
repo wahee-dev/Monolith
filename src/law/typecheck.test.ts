@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { typecheckExpression, typecheckAllExpressions, guardTypeCheck } from './typecheck';
+import { typecheckExpressionWrapper as typecheckExpression, typecheckAllExpressions, guardTypeCheckWrapper as guardTypeCheck } from './typecheck';
 
 describe('typecheckExpression', () => {
   it('returns valid for empty source', () => {
