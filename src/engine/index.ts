@@ -78,4 +78,4 @@ export { preprocessImports, isJSHybrid } from './preprocessor';
 export { evaluateJS, executeWithMonolith } from './js-evaluator';
 
 export { getMonolithAPI, createMonolithAPI } from './monolith-api';
-export type { ComponentConfig, NotificationType } from './monolith-api';
+export type { ComponentDefinition, NotificationType, ProjectState } from './monolith-api';
