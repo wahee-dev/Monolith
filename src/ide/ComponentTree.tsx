@@ -318,8 +318,8 @@ export function ComponentTreePanel({
           display: 'flex',
           flexDirection: 'column',
           height: '100%',
-          backgroundColor: '#1a1a1a',
-          borderRight: '1px solid #252525',
+          backgroundColor: '#252833',
+          borderRight: '1px solid #1d1f27',
           width: '40px',
           flexShrink: 0,
         }}
@@ -330,7 +330,7 @@ export function ComponentTreePanel({
             alignItems: 'center',
             justifyContent: 'center',
             padding: '8px',
-            borderBottom: '1px solid #252525',
+            borderBottom: '1px solid #1d1f27',
           }}
         >
           <button
@@ -357,11 +357,12 @@ export function ComponentTreePanel({
         display: 'flex',
         flexDirection: 'column',
         height: '100%',
-        backgroundColor: '#1a1a1a',
-        borderRight: '1px solid #252525',
-        fontSize: '11px',
-        color: '#aaaaaa',
+        backgroundColor: '#252833',
+        borderRight: '1px solid #1d1f27',
+        fontSize: '13px',
+        color: '#e0e0e0',
         position: 'relative',
+        fontFamily: 'system-ui, -apple-system, sans-serif',
       }}
     >
       <div
@@ -370,13 +371,14 @@ export function ComponentTreePanel({
           alignItems: 'center',
           justifyContent: 'space-between',
           padding: '8px 12px',
-          borderBottom: '1px solid #252525',
+          backgroundColor: '#2b2e3b',
+          borderBottom: '1px solid #1d1f27',
           flexShrink: 0,
         }}
       >
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-          <span style={{ fontSize: '14px' }}>🌲</span>
-          <span style={{ fontWeight: 'bold', fontSize: '12px', color: '#e0e0e0' }}>
+          <span style={{ fontSize: '14px', color: '#478cbf' }}>🌲</span>
+          <span style={{ fontWeight: '600', fontSize: '12px', color: '#e0e0e0', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
             Scene
           </span>
         </div>
@@ -398,9 +400,9 @@ export function ComponentTreePanel({
           <button
             style={{
               background: 'transparent',
-              border: '1px solid #333',
-              color: '#888',
-              padding: '2px 6px',
+              border: '1px solid #444',
+              color: '#e0e0e0',
+              padding: '2px 8px',
               fontSize: '12px',
               cursor: 'pointer',
               borderRadius: '3px',
@@ -413,7 +415,7 @@ export function ComponentTreePanel({
         </div>
       </div>
 
-      <div style={{ flex: 1, overflow: 'auto', padding: '8px 0' }}>
+      <div style={{ flex: 1, overflow: 'auto', padding: '4px 0' }}>
         {tree.length === 0 ? (
           <div
             style={{

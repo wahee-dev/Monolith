@@ -19,7 +19,8 @@ export function applyEvent(
     case 'LATTICE.REMOVE_CONNECTION':
       return { ok: true, state: removeConnection(state, event.connectionId) };
     case 'LATTICE.EXECUTE_NODE': {
-      const node = state.nodes.get(event.nodeId);
+      const activeScene = state.scenes.get(state.activeSceneId);
+      const node = activeScene?.nodes.get(event.nodeId);
       if (node === undefined) {
         return {
           ok: false,

@@ -1,5 +1,5 @@
 import type { LawResult } from '@law/types';
-import type { LatticeState, LatticeNode, LatticeConnection, LatticeNodeId } from './types';
+import type { LatticeState, LatticeNode, LatticeConnection, LatticeNodeId, SceneState } from './types';
 import { createLatticeNodeId } from './types';
 
 interface SerializedNode {
@@ -16,14 +16,21 @@ interface SerializedConnection {
   readonly toPort: string;
 }
 
+interface SerializedScene {
+  readonly id: string;
+  readonly name: string;
+  readonly nodes: ReadonlyArray<SerializedNode>;
+  readonly connections: ReadonlyArray<SerializedConnection>;
+}
+
 interface SerializedValue {
   readonly nodeId: string;
   readonly value: unknown;
 }
 
 interface SerializedState {
-  readonly nodes: ReadonlyArray<SerializedNode>;
-  readonly connections: ReadonlyArray<SerializedConnection>;
+  readonly scenes: ReadonlyArray<SerializedScene>;
+  readonly activeSceneId: string;
   readonly values: ReadonlyArray<SerializedValue>;
   readonly status: LatticeState['status'];
   readonly version: number;
@@ -54,22 +61,32 @@ function deterministicStringify(value: unknown): string {
 }
 
 function toSerializable(state: LatticeState): SerializedState {
-  const nodes: SerializedNode[] = [];
-  for (const [id, node] of state.nodes) {
-    nodes.push({
-      id: id as string,
-      kind: node.kind,
-      schema: node.schema,
+  const scenes: SerializedScene[] = [];
+  for (const scene of state.scenes.values()) {
+    const nodes: SerializedNode[] = [];
+    for (const [id, node] of scene.nodes) {
+      nodes.push({
+        id: id as string,
+        kind: node.kind,
+        schema: node.schema,
+      });
+    }
+
+    const connections: SerializedConnection[] = scene.connections.map((conn: any) => ({
+      id: conn.id,
+      from: conn.from as string,
+      to: conn.to as string,
+      fromPort: conn.fromPort,
+      toPort: conn.toPort,
+    }));
+
+    scenes.push({
+      id: scene.id,
+      name: scene.name,
+      nodes,
+      connections,
     });
   }
-
-  const connections: SerializedConnection[] = state.connections.map((conn) => ({
-    id: conn.id,
-    from: conn.from as string,
-    to: conn.to as string,
-    fromPort: conn.fromPort,
-    toPort: conn.toPort,
-  }));
 
   const values: SerializedValue[] = [];
   for (const [id, val] of state.values) {
@@ -77,8 +94,8 @@ function toSerializable(state: LatticeState): SerializedState {
   }
 
   return {
-    nodes,
-    connections,
+    scenes,
+    activeSceneId: state.activeSceneId,
     values,
     status: state.status,
     version: state.version,
@@ -88,46 +105,33 @@ function toSerializable(state: LatticeState): SerializedState {
 function fromDeserialized(
   serialized: SerializedState,
 ): LawResult<LatticeState> {
-  if (typeof serialized.version !== 'number') {
-    return {
-      ok: false,
-      error: {
-        code: 'TOKEN_INVALID',
-        message: 'Invalid state: version must be a number',
-      },
-    };
-  }
+  const scenes = new Map<string, SceneState>();
+  for (const ss of serialized.scenes) {
+    const nodes = new Map<LatticeNodeId, LatticeNode>();
+    for (const sn of ss.nodes) {
+      const nodeId = createLatticeNodeId(sn.id);
+      nodes.set(nodeId, {
+        id: nodeId,
+        kind: sn.kind,
+        schema: sn.schema,
+      });
+    }
 
-  const validStatuses: ReadonlyArray<string> = [
-    'idle', 'running', 'paused', 'error', 'committed', 'rolledback',
-  ];
-  if (!validStatuses.includes(serialized.status)) {
-    return {
-      ok: false,
-      error: {
-        code: 'TOKEN_INVALID',
-        message: `Invalid state: unknown status '${String(serialized.status)}'`,
-      },
-    };
-  }
+    const connections: LatticeConnection[] = ss.connections.map((sc) => ({
+      id: sc.id,
+      from: createLatticeNodeId(sc.from),
+      to: createLatticeNodeId(sc.to),
+      fromPort: sc.fromPort,
+      toPort: sc.toPort,
+    }));
 
-  const nodes = new Map<LatticeNodeId, LatticeNode>();
-  for (const sn of serialized.nodes) {
-    const nodeId = createLatticeNodeId(sn.id);
-    nodes.set(nodeId, {
-      id: nodeId,
-      kind: sn.kind,
-      schema: sn.schema,
+    scenes.set(ss.id, {
+      id: ss.id,
+      name: ss.name,
+      nodes,
+      connections,
     });
   }
-
-  const connections: LatticeConnection[] = serialized.connections.map((sc) => ({
-    id: sc.id,
-    from: createLatticeNodeId(sc.from),
-    to: createLatticeNodeId(sc.to),
-    fromPort: sc.fromPort,
-    toPort: sc.toPort,
-  }));
 
   const values = new Map<LatticeNodeId, unknown>();
   for (const sv of serialized.values) {
@@ -137,8 +141,8 @@ function fromDeserialized(
   return {
     ok: true,
     value: {
-      nodes,
-      connections,
+      scenes,
+      activeSceneId: serialized.activeSceneId,
       values,
       status: serialized.status,
       version: serialized.version,
@@ -176,52 +180,6 @@ export function deserializeState(json: string): LawResult<LatticeState> {
   }
 
   const obj = parsed as Record<string, unknown>;
-  if (!Array.isArray(obj['nodes'])) {
-    return {
-      ok: false,
-      error: {
-        code: 'TOKEN_INVALID',
-        message: 'Invalid state: nodes must be an array',
-      },
-    };
-  }
-  if (!Array.isArray(obj['connections'])) {
-    return {
-      ok: false,
-      error: {
-        code: 'TOKEN_INVALID',
-        message: 'Invalid state: connections must be an array',
-      },
-    };
-  }
-  if (!Array.isArray(obj['values'])) {
-    return {
-      ok: false,
-      error: {
-        code: 'TOKEN_INVALID',
-        message: 'Invalid state: values must be an array',
-      },
-    };
-  }
-  if (typeof obj['status'] !== 'string') {
-    return {
-      ok: false,
-      error: {
-        code: 'TOKEN_INVALID',
-        message: 'Invalid state: status must be a string',
-      },
-    };
-  }
-  if (typeof obj['version'] !== 'number') {
-    return {
-      ok: false,
-      error: {
-        code: 'TOKEN_INVALID',
-        message: 'Invalid state: version must be a number',
-      },
-    };
-  }
-
   return fromDeserialized(obj as unknown as SerializedState);
 }
 

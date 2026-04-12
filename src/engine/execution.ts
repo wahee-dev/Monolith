@@ -109,8 +109,9 @@ function buildNodeInput(
   state: LatticeState,
 ): Record<string, unknown> {
   const input: Record<string, unknown> = {};
-  for (let i = 0; i < state.connections.length; i++) {
-    const conn = state.connections[i]!;
+  const activeScene = state.scenes.get(state.activeSceneId)!;
+  for (let i = 0; i < activeScene.connections.length; i++) {
+    const conn = activeScene.connections[i]!;
     if (conn.to === nodeId) {
       const sourceValue = state.values.get(conn.from as LatticeNodeId);
       if (sourceValue !== undefined) {
@@ -140,6 +141,7 @@ function inferPortType(value: unknown): PortType {
 }
 
 export function startExecution(state: LatticeState): LawResult<ExecutionState> {
+  const activeScene = state.scenes.get(state.activeSceneId)!;
   const nodeIds: string[] = [];
   const nodeLikeMap = new Map<
     string,
@@ -150,7 +152,7 @@ export function startExecution(state: LatticeState): LawResult<ExecutionState> {
     }
   >();
 
-  for (const [id, node] of state.nodes) {
+  for (const [id, node] of activeScene.nodes) {
     const nodeId = id as string;
     nodeIds.push(nodeId);
     const defResult = getNodeTypeDefinition(node.kind);
@@ -165,7 +167,7 @@ export function startExecution(state: LatticeState): LawResult<ExecutionState> {
     }
   }
 
-  const connectionLike = state.connections.map((conn) => ({
+  const connectionLike = activeScene.connections.map((conn: any) => ({
     id: conn.id,
     from: conn.from as string,
     to: conn.to as string,
@@ -187,8 +189,8 @@ export function startExecution(state: LatticeState): LawResult<ExecutionState> {
     };
   }
 
-  const simpleConnections = state.connections.map(
-    (conn): { readonly from: string; readonly to: string } => ({
+  const simpleConnections = activeScene.connections.map(
+    (conn: any): { readonly from: string; readonly to: string } => ({
       from: conn.from as string,
       to: conn.to as string,
     }),
@@ -262,7 +264,8 @@ export function stepExecution(
     };
   }
 
-  const node = latticeState.nodes.get(step.nodeId as LatticeNodeId);
+  const activeScene = latticeState.scenes.get(latticeState.activeSceneId)!;
+  const node = activeScene.nodes.get(step.nodeId as LatticeNodeId);
   if (node === undefined) {
     return {
       ok: false,

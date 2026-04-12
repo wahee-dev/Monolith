@@ -41,32 +41,31 @@ export function NodeCard({ definition, onAddNode }: NodeCardProps): React.ReactE
         height: '34px',
         display: 'flex',
         alignItems: 'center',
-        gap: '6px',
-        padding: '0 8px',
+        gap: '8px',
+        padding: '0 12px',
         cursor: 'pointer',
-        borderLeft: `3px solid ${categoryColor}`,
-        backgroundColor: '#1a1a2e',
-        transition: 'background-color 0.15s',
+        borderLeft: `2px solid ${categoryColor}`,
+        backgroundColor: 'transparent',
+        transition: 'background-color 0.1s',
         boxSizing: 'border-box',
-        fontFamily: 'monospace',
+        fontFamily: 'system-ui, -apple-system, sans-serif',
       }}
       onMouseEnter={(e: React.MouseEvent<HTMLDivElement>): void => {
         const target = e.currentTarget;
-        target.style.backgroundColor = '#222240';
+        target.style.backgroundColor = '#333644';
       }}
       onMouseLeave={(e: React.MouseEvent<HTMLDivElement>): void => {
         const target = e.currentTarget;
-        target.style.backgroundColor = '#1a1a2e';
+        target.style.backgroundColor = 'transparent';
       }}
     >
       <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
           <span
             style={{
-              color: categoryColor,
-              fontSize: '11px',
-              fontWeight: 'bold',
-              fontFamily: 'monospace',
+              color: '#e0e0e0',
+              fontSize: '12px',
+              fontWeight: '500',
               whiteSpace: 'nowrap',
               overflow: 'hidden',
               textOverflow: 'ellipsis',

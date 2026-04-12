@@ -139,12 +139,13 @@ export function NodeView({
         y={rect.y}
         width={rect.width}
         height={rect.height}
-        rx="6"
-        ry="6"
-        fill="#1a1a2e"
-        stroke={isSelected ? color : '#2a2a3e'}
-        strokeWidth={isSelected ? '2.5' : '1.5'}
+        rx="4"
+        ry="4"
+        fill="#252833"
+        stroke={isSelected ? '#478cbf' : '#1d1f27'}
+        strokeWidth={isSelected ? '2' : '1'}
         filter={selectionFilter}
+        box-shadow="0 4px 12px rgba(0,0,0,0.5)"
       />
       {typeStatus !== 'unchecked' && (
         <rect
@@ -177,38 +178,44 @@ export function NodeView({
         x={rect.x}
         y={rect.y}
         width={rect.width}
-        height="28"
-        rx="6"
-        ry="6"
-        fill={color}
-        fillOpacity="0.15"
+        height="26"
+        rx="4"
+        ry="4"
+        fill="#2b2e3b"
       />
       <rect
         x={rect.x}
-        y={rect.y + 22}
+        y={rect.y + 20}
         width={rect.width}
         height="6"
+        fill="#2b2e3b"
+      />
+      <rect
+        x={rect.x}
+        y={rect.y}
+        width="4"
+        height="26"
         fill={color}
-        fillOpacity="0.15"
+        rx="2"
       />
       <text
-        x={rect.x + rect.width / 2}
-        y={rect.y + 19}
-        fill={color}
-        fontSize="12"
-        fontFamily="monospace"
-        fontWeight="bold"
-        textAnchor="middle"
+        x={rect.x + 12}
+        y={rect.y + 17}
+        fill="#e0e0e0"
+        fontSize="11"
+        fontFamily="system-ui"
+        fontWeight="600"
+        textAnchor="start"
       >
         {label}
       </text>
       <line
         x1={rect.x}
-        y1={rect.y + 28}
+        y1={rect.y + 26}
         x2={rect.x + rect.width}
-        y2={rect.y + 28}
-        stroke={color}
-        strokeOpacity="0.3"
+        y2={rect.y + 26}
+        stroke="#1d1f27"
+        strokeWidth="1"
       />
       {fields.map((field) => (
         <FieldViewComponent key={`${node.id}-${field.name}`} field={field} />

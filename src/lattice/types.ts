@@ -18,7 +18,13 @@ export type LatticeNodeKind =
   | 'sink'
   | 'gate'
   | 'merge'
-  | 'split';
+  | 'split'
+  | 'text'
+  | 'button'
+  | 'input'
+  | 'container'
+  | 'image'
+  | 'flex';
 
 export interface NodeSchema {
   readonly input: Record<string, SchemaField>;
@@ -32,11 +38,18 @@ export interface SchemaField {
 }
 
 export interface LatticeState {
-  readonly nodes: ReadonlyMap<LatticeNodeId, LatticeNode>;
-  readonly connections: ReadonlyArray<LatticeConnection>;
+  readonly scenes: ReadonlyMap<string, SceneState>;
+  readonly activeSceneId: string;
   readonly values: ReadonlyMap<LatticeNodeId, unknown>;
   readonly status: LatticeStatus;
   readonly version: number;
+}
+
+export interface SceneState {
+  readonly id: string;
+  readonly name: string;
+  readonly nodes: ReadonlyMap<LatticeNodeId, LatticeNode>;
+  readonly connections: ReadonlyArray<LatticeConnection>;
 }
 
 export type LatticeStatus =

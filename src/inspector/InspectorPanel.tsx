@@ -74,13 +74,13 @@ export function InspectorPanel({
   return (
     <div
       style={{
-        width: '260px',
+        width: '300px',
         height: '100%',
-        backgroundColor: '#0c0c14',
-        borderLeft: '1px solid #2a2a3e',
+        backgroundColor: '#252833',
+        borderLeft: '1px solid #1d1f27',
         display: 'flex',
         flexDirection: 'column',
-        fontFamily: 'monospace',
+        fontFamily: 'system-ui, -apple-system, sans-serif',
         overflow: 'hidden',
         flexShrink: 0,
       }}
@@ -92,9 +92,9 @@ export function InspectorPanel({
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'space-between',
-              padding: '8px',
-              borderBottom: '1px solid #2a2a3e',
-              backgroundColor: '#14141f',
+              padding: '8px 12px',
+              borderBottom: '1px solid #1d1f27',
+              backgroundColor: '#2b2e3b',
             }}
           >
             <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
@@ -102,8 +102,8 @@ export function InspectorPanel({
                 style={{
                   color: '#e0e0e0',
                   fontSize: '13px',
-                  fontWeight: 'bold',
-                  fontFamily: 'monospace',
+                  fontWeight: '600',
+                  letterSpacing: '0.3px',
                 }}
               >
                 {nodeDefinition.label}
@@ -113,9 +113,9 @@ export function InspectorPanel({
                   color: CATEGORY_COLORS[nodeDefinition.category],
                   backgroundColor: `${CATEGORY_COLORS[nodeDefinition.category]}22`,
                   padding: '1px 6px',
-                  borderRadius: '8px',
+                  borderRadius: '4px',
                   fontSize: '9px',
-                  fontFamily: 'monospace',
+                  fontWeight: 'bold',
                   textTransform: 'uppercase',
                 }}
               >
@@ -172,26 +172,24 @@ export function InspectorPanel({
               gap: '0',
             }}
           >
-            <div style={{ padding: '8px', borderBottom: '1px solid #2a2a3e' }}>
+            <div style={{ padding: '12px', borderBottom: '1px solid #1d1f27' }}>
               <span
                 style={{
-                  color: '#666',
+                  color: '#888',
                   fontSize: '10px',
-                  fontFamily: 'monospace',
                   fontWeight: 'bold',
                   textTransform: 'uppercase',
-                  letterSpacing: '0.5px',
+                  letterSpacing: '0.8px',
                 }}
               >
                 Description
               </span>
               <p
                 style={{
-                  color: '#ccc',
-                  fontSize: '10px',
-                  fontFamily: 'monospace',
-                  margin: '2px 0 0 0',
-                  lineHeight: 1.4,
+                  color: '#aaa',
+                  fontSize: '11px',
+                  margin: '4px 0 0 0',
+                  lineHeight: 1.5,
                 }}
               >
                 {nodeDefinition.description}

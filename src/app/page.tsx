@@ -6,10 +6,11 @@ import { NodePalette } from '@palette/index';
 import type { PaletteState } from '@palette/types';
 import { InspectorPanel } from '@inspector/index';
 import type { InspectorState } from '@inspector/types';
-import { ShadowAppPanel, projectShadowApp } from '@preview/index';
-import type { LatticeState, LatticeNode, LatticeNodeId, LatticeNodeKind, LatticeConnection, NodeSchema, SchemaField } from '@lattice/types';
+import { ShadowAppPanel, projectShadowApp, LiveApp } from '@preview/index';
+import type { LatticeState, LatticeNode, LatticeNodeId, LatticeNodeKind, LatticeConnection, NodeSchema, SchemaField, SceneState } from '@lattice/types';
 import { createLatticeNodeId } from '@lattice/types';
-import { addNode, removeNode, addConnection, removeConnection } from '@lattice/actions';
+import { addNode, removeNode, addConnection, removeConnection, setActiveScene, addScene } from '@lattice/actions';
+import { serializeState, deserializeState } from '@lattice/persistence';
 import { parseAndTypeCheck } from '@lattice/expression';
 import type { Point } from '@mesh/types';
 import type { PortType, GraphValidation } from '@engine/types';
@@ -78,6 +79,12 @@ const KIND_SCHEMAS: Record<LatticeNodeKind, NodeSchema> = {
       right: { name: 'right', type: 'string', required: true },
     },
   },
+  text: { input: {}, output: { element: { name: 'element', type: 'object', required: true } } },
+  button: { input: {}, output: { element: { name: 'element', type: 'object', required: true } } },
+  input: { input: {}, output: { element: { name: 'element', type: 'object', required: true } } },
+  container: { input: { children: { name: 'children', type: 'object', required: true } }, output: { element: { name: 'element', type: 'object', required: true } } },
+  image: { input: {}, output: { element: { name: 'element', type: 'object', required: true } } },
+  flex: { input: { children: { name: 'children', type: 'object', required: true } }, output: { element: { name: 'element', type: 'object', required: true } } },
 };
 
 function getSchemaForKind(kind: LatticeNodeKind): NodeSchema {
@@ -127,12 +134,19 @@ function createSampleState(): {
     toPort: 'receive',
   };
 
-  const state: LatticeState = {
+  const mainScene: SceneState = {
+    id: 'main',
+    name: 'Main',
     nodes: new Map([
       [sourceId, sourceNode],
       [sinkId, sinkNode],
     ]),
     connections: [sampleConn],
+  };
+
+  const state: LatticeState = {
+    scenes: new Map([['main', mainScene]]),
+    activeSceneId: 'main',
     values: new Map(),
     status: 'idle',
     version: 1,
@@ -172,14 +186,14 @@ export default function Home(): React.ReactElement {
   const [executionResult, setExecutionResult] = useState<GraphExecutionResult | null>(null);
   const [showPreview, setShowPreview] = useState<boolean>(false);
   const [idePanelState, setIdePanelState] = useState<IDEPanelState>({
-    isOpen: false,
-    leftWidth: 220,
-    rightWidth: 280,
+    isOpen: true,
+    leftWidth: 260,
+    rightWidth: 300,
     showCodeEditor: false,
   });
-  const [showLeftPanel, setShowLeftPanel] = useState<boolean>(false);
-  const [showRightPanel, setShowRightPanel] = useState<boolean>(false);
-  const [showBottomPanel, setShowBottomPanel] = useState<boolean>(false);
+  const [showLeftPanel, setShowLeftPanel] = useState<boolean>(true);
+  const [showRightPanel, setShowRightPanel] = useState<boolean>(true);
+  const [showBottomPanel, setShowBottomPanel] = useState<boolean>(true);
   const [activeMenu, setActiveMenu] = useState<string | null>(null);
   const [consoleState, setConsoleState] = useState<ConsoleState>({
     isOpen: true,
@@ -194,8 +208,10 @@ export default function Home(): React.ReactElement {
 
   const typeCheckGuard = useTypeCheckGuard();
 
+  const activeScene = useMemo(() => latticeState.scenes.get(latticeState.activeSceneId)!, [latticeState]);
+
   const graphValidation = useMemo((): GraphValidation | null => {
-    if (latticeState.nodes.size === 0) return null;
+    if (activeScene.nodes.size === 0) return null;
 
     const nodeLikeMap = new Map<
       string,
@@ -206,7 +222,7 @@ export default function Home(): React.ReactElement {
       }
     >();
 
-    for (const [id, node] of latticeState.nodes) {
+    for (const [id, node] of activeScene.nodes) {
       const defResult = getNodeTypeDefinition(node.kind);
       if (defResult.ok) {
         nodeLikeMap.set(id as string, defResult.value);
@@ -215,7 +231,7 @@ export default function Home(): React.ReactElement {
       }
     }
 
-    const connectionLike = latticeState.connections.map((conn) => ({
+    const connectionLike = activeScene.connections.map((conn) => ({
       id: conn.id,
       from: conn.from as string,
       to: conn.to as string,
@@ -224,7 +240,7 @@ export default function Home(): React.ReactElement {
     }));
 
     return validateGraph(nodeLikeMap, connectionLike);
-  }, [latticeState.nodes, latticeState.connections]);
+  }, [activeScene]);
 
   const pushToHistory = useCallback(
     (label: string): void => {
@@ -294,6 +310,14 @@ export default function Home(): React.ReactElement {
     [pushToHistory],
   );
 
+  const handleAddScene = useCallback((): void => {
+    const name = prompt('Enter scene name:');
+    if (name) {
+      const id = `scene-${Date.now()}`;
+      setLatticeState((prev) => addScene(prev, id, name));
+    }
+  }, []);
+
   const loadTemplate = useCallback(
     (template: Template): void => {
       pushToHistory('Load template: ' + template.name);
@@ -330,8 +354,8 @@ export default function Home(): React.ReactElement {
       }
 
       const newState: LatticeState = {
-        nodes: newNodes,
-        connections: newConnections,
+        scenes: new Map([['main', { id: 'main', name: 'Main', nodes: newNodes, connections: newConnections }]]),
+        activeSceneId: 'main',
         values: new Map(),
         status: 'idle',
         version: 1,
@@ -352,11 +376,49 @@ export default function Home(): React.ReactElement {
   useEffect(() => {
     if (initialTemplateLoaded.current) return;
     initialTemplateLoaded.current = true;
-    if (latticeState.nodes.size === 0) {
+    if (activeScene.nodes.size === 0) {
       const starter = getTemplateById('getting-started');
       if (starter !== undefined) loadTemplate(starter);
     }
-  }, [latticeState.nodes.size, loadTemplate]);
+  }, [activeScene.nodes.size, loadTemplate]);
+
+  // Auto-run and auto-save
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      handleRun();
+      // Auto-save to localStorage
+      try {
+        const projectData = {
+          latticeState: serializeState(latticeState),
+          expressions: Array.from(expressions.entries()),
+          nodePositions: Array.from(nodePositions.entries()),
+        };
+        localStorage.setItem('monolith_project', JSON.stringify(projectData));
+      } catch (e) {
+        // Ignore save errors
+      }
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [latticeState, expressions, nodePositions]);
+
+  // Initial load from localStorage
+  useEffect(() => {
+    const saved = localStorage.getItem('monolith_project');
+    if (saved) {
+      try {
+        const data = JSON.parse(saved);
+        const deserializedState = deserializeState(data.latticeState);
+        if (deserializedState.ok) {
+          setLatticeState(deserializedState.value);
+          setExpressions(new Map(data.expressions));
+          setNodePositions(new Map(data.nodePositions));
+          initialTemplateLoaded.current = true;
+        }
+      } catch (e) {
+        // Fallback to template
+      }
+    }
+  }, []);
 
   const handleDeleteSelected = useCallback((): void => {
     if (selectedNodeId !== null) {
@@ -544,6 +606,15 @@ export default function Home(): React.ReactElement {
     }
   }, [historyState]);
 
+  const handleTreeSelect = useCallback(
+    (selection: import("@ide/types").TreeSelection): void => {
+      if (selection.pageId && selection.type === 'page') {
+        setLatticeState((prev) => setActiveScene(prev, selection.pageId!));
+      }
+    },
+    [],
+  );
+
   const addConsoleEntry = useCallback(
     (type: ConsoleEntry['type'], message: string, nodeId?: string, details?: string): void => {
       const entry: ConsoleEntry = {
@@ -642,12 +713,132 @@ export default function Home(): React.ReactElement {
     setActiveMenu((prev) => (prev === menu ? null : menu));
   }, []);
 
+  const handleExportJSON = useCallback((): void => {
+    const projectData = {
+      latticeState: serializeState(latticeState),
+      expressions: Array.from(expressions.entries()),
+      nodePositions: Array.from(nodePositions.entries()),
+    };
+    const blob = new Blob([JSON.stringify(projectData, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `project-${Date.now()}.json`;
+    link.click();
+    getMonolithAPI().notify('Project exported!', 'success');
+  }, [latticeState, expressions, nodePositions]);
+
+  const handleImportJSON = useCallback((): void => {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = '.json';
+    input.onchange = (e): void => {
+      const file = (e.target as HTMLInputElement).files?.[0];
+      if (file) {
+        const reader = new FileReader();
+        reader.onload = (re): void => {
+          try {
+            const data = JSON.parse(re.target?.result as string);
+            const deserializedState = deserializeState(data.latticeState);
+            if (deserializedState.ok) {
+              setLatticeState(deserializedState.value);
+              setExpressions(new Map(data.expressions));
+              setNodePositions(new Map(data.nodePositions));
+              getMonolithAPI().notify('Project imported!', 'success');
+            }
+          } catch (err) {
+            getMonolithAPI().notify('Import failed: invalid file', 'error');
+          }
+        };
+        reader.readAsText(file);
+      }
+    };
+    input.click();
+  }, []);
+
+  const handleBuildForWeb = useCallback((): void => {
+    const projectData = {
+      latticeState: serializeState(latticeState),
+      expressions: Array.from(expressions.entries()),
+    };
+    const html = `
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Monolith App Build</title>
+    <style>
+        body { margin: 0; font-family: system-ui, -apple-system, sans-serif; background: #fff; color: #333; }
+        .app-container { padding: 40px; max-width: 800px; margin: 0 auto; }
+        .node-element { margin-bottom: 20px; padding: 15px; border: 1px solid #eee; border-radius: 8px; }
+        .button { padding: 8px 16px; background: #478cbf; color: #fff; border: none; border-radius: 4px; cursor: pointer; }
+        .input { padding: 8px; border: 1px solid #ccc; border-radius: 4px; width: 100%; box-sizing: border-box; }
+    </style>
+</head>
+<body>
+    <div id="root" class="app-container">
+        <div id="loading">Loading project...</div>
+    </div>
+    <script>
+        const project = ${JSON.stringify(projectData)};
+        const state = JSON.parse(project.latticeState);
+        const root = document.getElementById('root');
+
+        function render() {
+            root.innerHTML = '';
+            const activeScene = state.scenes[state.activeSceneId];
+            const title = document.createElement('h1');
+            title.textContent = activeScene.name;
+            root.appendChild(title);
+
+            Object.values(activeScene.nodes).forEach(node => {
+                const el = document.createElement('div');
+                el.className = 'node-element';
+
+                if (node.kind === 'text') {
+                    el.textContent = 'Text Element: ' + node.id;
+                } else if (node.kind === 'button') {
+                    const btn = document.createElement('button');
+                    btn.className = 'button';
+                    btn.textContent = 'Button';
+                    btn.onclick = () => alert('Event triggered on ' + node.id);
+                    el.appendChild(btn);
+                } else if (node.kind === 'input') {
+                    const input = document.createElement('input');
+                    input.className = 'input';
+                    input.placeholder = 'Input...';
+                    el.appendChild(input);
+                } else {
+                    el.textContent = node.kind.toUpperCase() + ' (' + node.id + ')';
+                }
+                root.appendChild(el);
+            });
+        }
+
+        try {
+            render();
+        } catch (e) {
+            root.innerHTML = '<h1>Error loading app</h1><pre>' + e.message + '</pre>';
+        }
+    </script>
+</body>
+</html>`;
+    const blob = new Blob([html], { type: 'text/html' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `app-build-${Date.now()}.html`;
+    link.click();
+    getMonolithAPI().notify('Build complete!', 'success');
+  }, [latticeState, expressions]);
+
   const handleMenuAction = useCallback((action: string): void => {
     setActiveMenu(null);
     switch (action) {
       case 'new':
         pushToHistory('New project');
-        setLatticeState({ nodes: new Map(), connections: [], values: new Map(), status: 'idle', version: 1 });
+        setLatticeState({ scenes: new Map([['main', { id: 'main', name: 'Main', nodes: new Map(), connections: [] }]]), activeSceneId: 'main', values: new Map(), status: 'idle', version: 1 });
         setNodePositions(new Map());
         setExpressions(new Map());
         setSelectedNodeId(null);
@@ -746,7 +937,7 @@ export default function Home(): React.ReactElement {
       if (selectedNodeId === null) return;
       const Monolith = getMonolithAPI();
 
-      const selectedNode = latticeState.nodes.get(selectedNodeId as LatticeNodeId);
+      const selectedNode = activeScene.nodes.get(selectedNodeId as LatticeNodeId);
       if (!selectedNode) return;
 
       const subgraphNodes = new Map<LatticeNodeId, LatticeNode>();
@@ -756,8 +947,8 @@ export default function Home(): React.ReactElement {
       subgraphNodes.set(selectedNodeId as LatticeNodeId, selectedNode);
       positions.set(selectedNodeId as string, nodePositions.get(selectedNodeId) ?? { x: 0, y: 0 });
 
-      for (let i = 0; i < latticeState.connections.length; i++) {
-        const conn = latticeState.connections[i]!;
+      for (let i = 0; i < activeScene.connections.length; i++) {
+        const conn = activeScene.connections[i]!;
         const fromId = conn.from as string;
         const toId = conn.to as string;
 
@@ -765,7 +956,7 @@ export default function Home(): React.ReactElement {
           subgraphConnections.push(conn);
 
           if (fromId !== selectedNodeId) {
-            const fromNode = latticeState.nodes.get(conn.from);
+            const fromNode = activeScene.nodes.get(conn.from);
             if (fromNode && !subgraphNodes.has(conn.from)) {
               subgraphNodes.set(conn.from, fromNode);
               positions.set(fromId, nodePositions.get(fromId) ?? { x: 0, y: 0 });
@@ -773,7 +964,7 @@ export default function Home(): React.ReactElement {
           }
 
           if (toId !== selectedNodeId) {
-            const toNode = latticeState.nodes.get(conn.to);
+            const toNode = activeScene.nodes.get(conn.to);
             if (toNode && !subgraphNodes.has(conn.to)) {
               subgraphNodes.set(conn.to, toNode);
               positions.set(toId, nodePositions.get(toId) ?? { x: 0, y: 0 });
@@ -783,14 +974,14 @@ export default function Home(): React.ReactElement {
       }
 
       Monolith.registerComponent(name, {
-        nodes: subgraphNodes as Map<string, unknown>,
-        connections: subgraphConnections,
-        positions: positions as Map<string, { x: number; y: number }>,
+        nodes: Object.fromEntries(subgraphNodes) as Record<string, unknown>,
+        connections: subgraphConnections as unknown[],
+        positions: Object.fromEntries(positions) as Record<string, { x: number; y: number }>,
       });
 
       Monolith.notify(`Component "${name}" registered!`, 'success');
     },
-    [selectedNodeId, latticeState, nodePositions],
+    [selectedNodeId, activeScene, nodePositions],
   );
 
   useKeyboardShortcuts(
@@ -820,7 +1011,7 @@ export default function Home(): React.ReactElement {
       };
     }
 
-    const node = latticeState.nodes.get(selectedNodeId as LatticeNodeId);
+    const node = activeScene.nodes.get(selectedNodeId as LatticeNodeId);
     const defResult = node !== undefined ? getNodeTypeDefinition(node.kind) : null;
     const nodeDef = defResult !== null && defResult.ok ? defResult.value : null;
     const expr = expressions.get(selectedNodeId) ?? '';
@@ -907,35 +1098,39 @@ export default function Home(): React.ReactElement {
       height: '100vh',
       display: 'flex',
       flexDirection: 'column',
-      backgroundColor: '#1a1a1a',
+      backgroundColor: '#20232e',
       overflow: 'hidden',
-      fontFamily: 'monospace',
+      fontFamily: 'system-ui, -apple-system, sans-serif',
+      color: '#e0e0e0',
     }}>
       <div style={{
         display: 'flex',
         alignItems: 'center',
-        height: '32px',
+        height: '34px',
         padding: '0 8px',
-        backgroundColor: '#252525',
-        borderBottom: '1px solid #333333',
-        fontSize: '12px',
+        backgroundColor: '#252833',
+        borderBottom: '1px solid #1d1f27',
+        fontSize: '13px',
         color: '#e0e0e0',
         zIndex: 10,
         flexShrink: 0,
       }}>
         <div style={{ position: 'relative' }}>
           <span
-            style={{ cursor: 'pointer', padding: '4px 8px', borderRadius: '3px', backgroundColor: activeMenu === 'file' ? '#3a3a3a' : 'transparent' }}
+            style={{ cursor: 'pointer', padding: '4px 10px', borderRadius: '4px', backgroundColor: activeMenu === 'file' ? '#333644' : 'transparent' }}
             onClick={(): void => handleMenuClick('file')}
           >
             File
           </span>
           {activeMenu === 'file' && (
-            <div style={{ position: 'absolute', top: '100%', left: 0, backgroundColor: '#252525', border: '1px solid #333333', borderRadius: '4px', padding: '4px 0', minWidth: '150px', boxShadow: '0 4px 12px rgba(0,0,0,0.5)' }}>
-              <div style={{ padding: '6px 16px', cursor: 'pointer', color: '#e0e0e0' }} onClick={(): void => handleMenuAction('new')}>New Project</div>
-              <div style={{ padding: '6px 16px', cursor: 'pointer', color: '#e0e0e0' }} onClick={(): void => handleMenuAction('save')}>Save</div>
-              <div style={{ height: '1px', backgroundColor: '#333333', margin: '4px 0' }} />
-              <div style={{ padding: '6px 16px', cursor: 'pointer', color: '#888888' }}>Export</div>
+            <div style={{ position: 'absolute', top: '100%', left: 0, backgroundColor: '#252833', border: '1px solid #1d1f27', borderRadius: '4px', padding: '4px 0', minWidth: '180px', boxShadow: '0 8px 16px rgba(0,0,0,0.4)', zIndex: 100 }}>
+              <div style={{ padding: '8px 16px', cursor: 'pointer', color: '#e0e0e0' }} onClick={(): void => handleMenuAction('new')}>New Project</div>
+              <div style={{ padding: '8px 16px', cursor: 'pointer', color: '#e0e0e0' }} onClick={(): void => handleMenuAction('save')}>Save</div>
+              <div style={{ height: '1px', backgroundColor: '#1d1f27', margin: '4px 0' }} />
+              <div style={{ padding: '8px 16px', cursor: 'pointer', color: '#e0e0e0' }} onClick={handleExportJSON}>Export JSON...</div>
+              <div style={{ padding: '8px 16px', cursor: 'pointer', color: '#e0e0e0' }} onClick={handleImportJSON}>Import JSON...</div>
+              <div style={{ height: '1px', backgroundColor: '#1d1f27', margin: '4px 0' }} />
+              <div style={{ padding: '8px 16px', cursor: 'pointer', color: '#478cbf', fontWeight: 'bold' }} onClick={handleBuildForWeb}>Build for Web</div>
             </div>
           )}
         </div>
@@ -1005,7 +1200,12 @@ export default function Home(): React.ReactElement {
 
         <span style={{ flex: 1 }} />
 
-        <span style={{ color: '#4a9eff', fontWeight: 'bold', fontSize: '13px', letterSpacing: '1px' }}>MONOLITH</span>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+          <div style={{ width: '18px', height: '18px', backgroundColor: '#478cbf', borderRadius: '4px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <span style={{ fontSize: '10px', color: '#fff' }}>M</span>
+          </div>
+          <span style={{ color: '#e0e0e0', fontWeight: '600', fontSize: '13px', letterSpacing: '0.5px' }}>MONOLITH ENGINE</span>
+        </div>
 
         <span style={{ flex: 1 }} />
 
@@ -1017,33 +1217,39 @@ export default function Home(): React.ReactElement {
           <span
             style={{
               cursor: 'pointer',
-              color: '#f59e0b',
+              color: '#ffdd75',
               fontWeight: 'bold',
-              padding: '2px 10px',
-              border: '1px solid #f59e0b',
-              borderRadius: '3px',
-              fontSize: '10px',
+              padding: '4px 12px',
+              backgroundColor: '#3d3a2e',
+              borderRadius: '4px',
+              fontSize: '11px',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px'
             }}
             onClick={handleStop}
-            title="Stop (Ctrl+.)"
+            title="Stop Project"
           >
-            ■ STOP
+            <span style={{ fontSize: '14px' }}>■</span> STOP
           </span>
         ) : (
           <span
             style={{
               cursor: 'pointer',
-              color: errorCount > 0 ? '#ef4444' : '#4aff9f',
+              color: '#99ff99',
               fontWeight: 'bold',
-              padding: '2px 10px',
-              border: `1px solid ${errorCount > 0 ? '#ef4444' : '#4aff9f'}`,
-              borderRadius: '3px',
-              fontSize: '10px',
+              padding: '4px 12px',
+              backgroundColor: '#2e3d33',
+              borderRadius: '4px',
+              fontSize: '11px',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px'
             }}
             onClick={handleRun}
-            title="Run (Ctrl+Enter)"
+            title="Run Project"
           >
-            ▶ RUN
+            <span style={{ fontSize: '14px' }}>▶</span> RUN
           </span>
         )}
 
@@ -1119,13 +1325,12 @@ export default function Home(): React.ReactElement {
 
       <div style={{ flex: 1, display: 'flex', overflow: 'hidden', position: 'relative' }}>
         <div style={{
-          width: showLeftPanel ? '220px' : '0px',
+          width: showLeftPanel ? '260px' : '0px',
           overflow: 'hidden',
-          transition: 'width 0.2s ease',
+          transition: 'width 0.15s ease-out',
           flexShrink: 0,
-          backgroundColor: '#252525',
-          borderRight: showLeftPanel ? '1px solid #333333' : 'none',
-          borderRadius: showLeftPanel ? '0 4px 4px 0' : '0',
+          backgroundColor: '#252833',
+          borderRight: showLeftPanel ? '1px solid #1d1f27' : 'none',
         }}>
           {showLeftPanel && (
             <NodePalette
@@ -1152,7 +1357,8 @@ export default function Home(): React.ReactElement {
             showCodeEditor: !prev.isOpen ? true : prev.showCodeEditor,
           }))}
           onToggleExpand={function (_id: string): void {}}
-          onTreeSelect={function (_selection: import("@ide/types").TreeSelection): void {}}
+          onTreeSelect={handleTreeSelect}
+          onAddPage={handleAddScene}
           onCodeChange={function (_code: string): void {}}
           onCodeSave={function (): void {}}
           onCodeApply={function (): void {}}
@@ -1195,20 +1401,38 @@ export default function Home(): React.ReactElement {
         </IDELayout>
 
         {showPreview && (
-          <ShadowAppPanel
-            state={shadowState}
-            executionResult={executionResult}
-          />
+          <div style={{
+            width: '400px',
+            height: '100%',
+            display: 'flex',
+            flexDirection: 'column',
+            borderLeft: '1px solid #1d1f27',
+            flexShrink: 0
+          }}>
+            <LiveApp
+              state={latticeState}
+              executionResult={executionResult}
+              onEvent={(nodeId, eventName, data) => {
+                addConsoleEntry('info', `Event: ${eventName} on ${nodeId}`, nodeId, JSON.stringify(data));
+                handleRun(); // Simple event-driven trigger for now
+              }}
+            />
+            <div style={{ height: '200px', borderTop: '1px solid #1d1f27' }}>
+              <ShadowAppPanel
+                state={shadowState}
+                executionResult={executionResult}
+              />
+            </div>
+          </div>
         )}
 
         <div style={{
-          width: showRightPanel ? '280px' : '0px',
+          width: showRightPanel ? '300px' : '0px',
           overflow: 'hidden',
-          transition: 'width 0.2s ease',
+          transition: 'width 0.15s ease-out',
           flexShrink: 0,
-          backgroundColor: '#252525',
-          borderLeft: showRightPanel ? '1px solid #333333' : 'none',
-          borderRadius: showRightPanel ? '4px 0 0 4px' : '0',
+          backgroundColor: '#252833',
+          borderLeft: showRightPanel ? '1px solid #1d1f27' : 'none',
         }}>
           {showRightPanel && (
             <InspectorPanel
@@ -1245,7 +1469,7 @@ export default function Home(): React.ReactElement {
         }} />
         <span style={{ color: statusColor, fontWeight: 'bold', fontSize: '10px' }}>{statusLabel}</span>
         <span style={{ color: '#333' }}>|</span>
-        <span style={{ fontSize: '10px' }}>{latticeState.nodes.size}n {latticeState.connections.length}e</span>
+        <span style={{ fontSize: '10px' }}>{activeScene.nodes.size}n {activeScene.connections.length}e</span>
         {errorCount > 0 && (
           <>
             <span style={{ color: '#333' }}>|</span>

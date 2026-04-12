@@ -18,12 +18,13 @@ export interface ExecutionStep {
 export function createExecutionPlan(
   state: LatticeState,
 ): LawResult<ReadonlyArray<ExecutionStep>> {
+  const activeScene = state.scenes.get(state.activeSceneId)!;
   const nodeIds: string[] = [];
-  for (const key of state.nodes.keys()) {
+  for (const key of activeScene.nodes.keys()) {
     nodeIds.push(key as string);
   }
 
-  const simpleConnections = state.connections.map((conn) => ({
+  const simpleConnections = activeScene.connections.map((conn) => ({
     from: conn.from as string,
     to: conn.to as string,
   }));
@@ -47,8 +48,9 @@ export function createExecutionPlan(
 export function getExecutionOrder(
   state: LatticeState,
 ): LawResult<ReadonlyArray<ReadonlyArray<string>>> {
+  const activeScene = state.scenes.get(state.activeSceneId)!;
   const nodeIds: string[] = [];
-  for (const key of state.nodes.keys()) {
+  for (const key of activeScene.nodes.keys()) {
     nodeIds.push(key as string);
   }
 
@@ -61,8 +63,8 @@ export function getExecutionOrder(
     dependents.set(id, []);
   }
 
-  for (let i = 0; i < state.connections.length; i++) {
-    const conn = state.connections[i]!;
+  for (let i = 0; i < activeScene.connections.length; i++) {
+    const conn = activeScene.connections[i]!;
     const to = conn.to as string;
     const from = conn.from as string;
     const count = incomingCount.get(to);

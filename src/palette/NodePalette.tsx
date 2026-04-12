@@ -143,14 +143,13 @@ export function NodePalette({
         style={{
           width: '32px',
           height: '100%',
-          backgroundColor: '#0c0c14',
-          borderRight: '1px solid #2a2a3e',
+          backgroundColor: '#252833',
+          borderRight: '1px solid #1d1f27',
           display: 'flex',
           flexDirection: 'column',
           alignItems: 'center',
           paddingTop: '6px',
           flexShrink: 0,
-          fontFamily: 'monospace',
         }}
       >
         <button
@@ -158,12 +157,11 @@ export function NodePalette({
           onClick={onToggle}
           style={{
             backgroundColor: 'transparent',
-            color: '#888888',
+            color: '#888',
             border: 'none',
             cursor: 'pointer',
             fontSize: '16px',
             padding: '2px',
-            fontFamily: 'monospace',
           }}
           title="Open palette"
         >
@@ -178,11 +176,11 @@ export function NodePalette({
       style={{
         width: '260px',
         height: '100%',
-        backgroundColor: '#0c0c14',
-        borderRight: '1px solid #2a2a3e',
+        backgroundColor: '#252833',
+        borderRight: '1px solid #1d1f27',
         display: 'flex',
         flexDirection: 'column',
-        fontFamily: 'monospace',
+        fontFamily: 'system-ui, -apple-system, sans-serif',
         flexShrink: 0,
       }}
     >
@@ -191,9 +189,9 @@ export function NodePalette({
           display: 'flex',
           alignItems: 'center',
           gap: '6px',
-          padding: '6px 8px',
-          borderBottom: '1px solid #2a2a3e',
-          backgroundColor: '#14141f',
+          padding: '8px',
+          borderBottom: '1px solid #1d1f27',
+          backgroundColor: '#2b2e3b',
         }}
       >
         <button
@@ -221,14 +219,13 @@ export function NodePalette({
             placeholder="Search nodes..."
             style={{
               width: '100%',
-              height: '32px',
-              backgroundColor: '#1a1a2e',
+              height: '28px',
+              backgroundColor: '#20232e',
               color: '#e0e0e0',
-              border: '1px solid #2a2a3e',
-              borderRadius: '3px',
-              padding: '0 8px 0 22px',
-              fontFamily: 'monospace',
-              fontSize: '11px',
+              border: '1px solid #1d1f27',
+              borderRadius: '4px',
+              padding: '0 8px 0 26px',
+              fontSize: '12px',
               outline: 'none',
               boxSizing: 'border-box',
             }}
@@ -253,10 +250,10 @@ export function NodePalette({
         style={{
           display: 'flex',
           overflowX: 'auto',
-          borderBottom: '1px solid #2a2a3e',
-          backgroundColor: '#14141f',
-          padding: '2px 4px',
-          gap: '1px',
+          borderBottom: '1px solid #1d1f27',
+          backgroundColor: '#2b2e3b',
+          padding: '4px',
+          gap: '2px',
           flexShrink: 0,
         }}
       >
@@ -274,31 +271,27 @@ export function NodePalette({
               onMouseEnter={(): void => setHoveredTab(tab)}
               onMouseLeave={(): void => setHoveredTab(null)}
               style={{
-                backgroundColor: isActive ? `${tabColor}22` : isHovered ? '#1a1a2e' : 'transparent',
-                color: isActive ? tabColor : '#888888',
+                backgroundColor: isActive ? '#333644' : isHovered ? '#2e313e' : 'transparent',
+                color: isActive ? '#e0e0e0' : '#888',
                 border: 'none',
-                borderBottom: isActive ? `2px solid ${tabColor}` : '2px solid transparent',
-                borderRadius: '0',
+                borderRadius: '3px',
                 cursor: 'pointer',
-                padding: '2px 6px',
-                fontSize: '9px',
-                fontFamily: 'monospace',
-                textTransform: 'uppercase' as const,
+                padding: '4px 8px',
+                fontSize: '11px',
+                textTransform: 'capitalize' as const,
                 whiteSpace: 'nowrap' as const,
                 display: 'flex',
                 alignItems: 'center',
-                gap: '3px',
+                gap: '5px',
+                transition: 'all 0.1s',
               }}
             >
               {tab}
               <span
                 style={{
-                  backgroundColor: isActive ? `${tabColor}33` : '#2a2a3e',
-                  color: isActive ? tabColor : '#888888',
-                  padding: '0px 3px',
-                  borderRadius: '6px',
-                  fontSize: '8px',
-                  fontFamily: 'monospace',
+                  color: isActive ? tabColor : '#666',
+                  fontSize: '10px',
+                  fontWeight: 'bold',
                 }}
               >
                 {count}

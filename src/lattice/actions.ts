@@ -1,5 +1,21 @@
-import type { LatticeState, LatticeStatus, LatticeNode, LatticeConnection, LatticeNodeId } from './types';
+import type { LatticeState, LatticeStatus, LatticeNode, LatticeConnection, LatticeNodeId, SceneState } from './types';
 import type { SnapshotState } from './context';
+
+export function getActiveScene(state: LatticeState): SceneState {
+  return state.scenes.get(state.activeSceneId)!;
+}
+
+function updateActiveScene(state: LatticeState, updater: (scene: SceneState) => SceneState): LatticeState {
+  const activeScene = getActiveScene(state);
+  const updatedScene = updater(activeScene);
+  const newScenes = new Map(state.scenes);
+  newScenes.set(state.activeSceneId, updatedScene);
+  return {
+    ...state,
+    scenes: newScenes,
+    version: state.version + 1,
+  };
+}
 
 export function updateStatus(state: LatticeState, status: LatticeStatus): LatticeState {
   return {
@@ -10,46 +26,40 @@ export function updateStatus(state: LatticeState, status: LatticeStatus): Lattic
 }
 
 export function addNode(state: LatticeState, node: LatticeNode): LatticeState {
-  const newNodes = new Map(state.nodes);
-  newNodes.set(node.id, node);
-  return {
-    ...state,
-    nodes: newNodes,
-    version: state.version + 1,
-  };
+  return updateActiveScene(state, (scene) => {
+    const newNodes = new Map(scene.nodes);
+    newNodes.set(node.id, node);
+    return { ...scene, nodes: newNodes };
+  });
 }
 
 export function removeNode(state: LatticeState, nodeId: LatticeNodeId): LatticeState {
-  const newNodes = new Map(state.nodes);
-  newNodes.delete(nodeId);
-  const newValues = new Map(state.values);
+  const newState = updateActiveScene(state, (scene) => {
+    const newNodes = new Map(scene.nodes);
+    newNodes.delete(nodeId);
+    const newConnections = scene.connections.filter(
+      (conn) => conn.from !== nodeId && conn.to !== nodeId,
+    );
+    return { ...scene, nodes: newNodes, connections: newConnections };
+  });
+
+  const newValues = new Map(newState.values);
   newValues.delete(nodeId);
-  const newConnections = state.connections.filter(
-    (conn) => conn.from !== nodeId && conn.to !== nodeId,
-  );
-  return {
-    ...state,
-    nodes: newNodes,
-    values: newValues,
-    connections: newConnections,
-    version: state.version + 1,
-  };
+  return { ...newState, values: newValues };
 }
 
 export function addConnection(state: LatticeState, connection: LatticeConnection): LatticeState {
-  return {
-    ...state,
-    connections: [...state.connections, connection],
-    version: state.version + 1,
-  };
+  return updateActiveScene(state, (scene) => ({
+    ...scene,
+    connections: [...scene.connections, connection],
+  }));
 }
 
 export function removeConnection(state: LatticeState, connectionId: string): LatticeState {
-  return {
-    ...state,
-    connections: state.connections.filter((conn) => conn.id !== connectionId),
-    version: state.version + 1,
-  };
+  return updateActiveScene(state, (scene) => ({
+    ...scene,
+    connections: scene.connections.filter((conn) => conn.id !== connectionId),
+  }));
 }
 
 export function setNodeValue(
@@ -66,6 +76,25 @@ export function setNodeValue(
   };
 }
 
+export function addScene(state: LatticeState, id: string, name: string): LatticeState {
+  const newScenes = new Map(state.scenes);
+  newScenes.set(id, { id, name, nodes: new Map(), connections: [] });
+  return {
+    ...state,
+    scenes: newScenes,
+    version: state.version + 1,
+  };
+}
+
+export function setActiveScene(state: LatticeState, sceneId: string): LatticeState {
+  if (!state.scenes.has(sceneId)) return state;
+  return {
+    ...state,
+    activeSceneId: sceneId,
+    version: state.version + 1,
+  };
+}
+
 export function captureSnapshot(state: LatticeState): SnapshotState {
   return { status: 'captured', state };
 }
@@ -75,9 +104,10 @@ export function clearSnapshot(): SnapshotState {
 }
 
 export function resetState(): LatticeState {
+  const mainScene: SceneState = { id: 'main', name: 'Main', nodes: new Map(), connections: [] };
   return {
-    nodes: new Map(),
-    connections: [],
+    scenes: new Map([['main', mainScene]]),
+    activeSceneId: 'main',
     values: new Map(),
     status: 'idle',
     version: 0,
@@ -85,18 +115,20 @@ export function resetState(): LatticeState {
 }
 
 export function validateState(state: LatticeState): { readonly ok: true; readonly value: LatticeState } | { readonly ok: false; readonly reason: string } {
-  for (const connection of state.connections) {
-    if (!state.nodes.has(connection.from)) {
-      return {
-        ok: false,
-        reason: `Connection '${connection.id}' references unknown source node '${connection.from as string}'`,
-      };
-    }
-    if (!state.nodes.has(connection.to)) {
-      return {
-        ok: false,
-        reason: `Connection '${connection.id}' references unknown target node '${connection.to as string}'`,
-      };
+  for (const scene of state.scenes.values()) {
+    for (const connection of scene.connections) {
+      if (!scene.nodes.has(connection.from)) {
+        return {
+          ok: false,
+          reason: `Connection '${connection.id}' in scene '${scene.name}' references unknown source node '${connection.from as string}'`,
+        };
+      }
+      if (!scene.nodes.has(connection.to)) {
+        return {
+          ok: false,
+          reason: `Connection '${connection.id}' in scene '${scene.name}' references unknown target node '${connection.to as string}'`,
+        };
+      }
     }
   }
   return { ok: true, value: state };

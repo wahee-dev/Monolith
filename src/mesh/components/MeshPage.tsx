@@ -56,15 +56,17 @@ export default function MeshPage({
 }: MeshPageProps): React.ReactElement {
   const view = useMeshProjection(latticeState, expressions, typeStatus, typeErrors);
 
+  const activeScene = useMemo(() => latticeState.scenes.get(latticeState.activeSceneId)!, [latticeState]);
+
   const existingConnections = useMemo(
     () =>
-      latticeState.connections.map((c) => ({
+      activeScene.connections.map((c: any) => ({
         from: c.from as string,
         to: c.to as string,
         fromPort: c.fromPort,
         toPort: c.toPort,
       })),
-    [latticeState.connections],
+    [activeScene.connections],
   );
 
   const errorNodeIds = useMemo((): ReadonlySet<string> => {
@@ -130,7 +132,7 @@ export default function MeshPage({
     return ids;
   }, [executionState]);
 
-  const isEmpty = latticeState.nodes.size === 0;
+  const isEmpty = activeScene.nodes.size === 0;
 
   return (
     <div style={{ width: '100%', height: '100%', position: 'relative' }}>

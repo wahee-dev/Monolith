@@ -202,23 +202,23 @@ export function Minimap({
     right: 16,
     width: MINIMAP_WIDTH,
     height: MINIMAP_HEIGHT,
-    background: 'rgba(12, 12, 20, 0.8)',
-    border: '1px solid #2a2a3e',
+    background: 'rgba(37, 40, 51, 0.85)',
+    border: '1px solid #1d1f27',
     borderRadius: 4,
     overflow: 'hidden',
-    fontFamily: 'monospace',
+    fontFamily: 'system-ui, -apple-system, sans-serif',
     cursor: isDragging ? 'grabbing' : 'grab',
     zIndex: 10,
     userSelect: 'none',
+    boxShadow: '0 4px 12px rgba(0,0,0,0.3)',
   };
 
   const labelStyle: React.CSSProperties = {
     position: 'absolute',
     top: 2,
     left: 4,
-    fontSize: 9,
-    color: '#888',
-    fontFamily: 'monospace',
+    fontSize: 10,
+    color: '#aaa',
     pointerEvents: 'none',
     zIndex: 1,
   };
@@ -227,9 +227,8 @@ export function Minimap({
     position: 'absolute',
     top: 2,
     right: 4,
-    fontSize: 9,
-    color: '#888',
-    fontFamily: 'monospace',
+    fontSize: 10,
+    color: '#aaa',
     pointerEvents: 'none',
     zIndex: 1,
   };
@@ -260,8 +259,8 @@ export function Minimap({
           y={vpRect.y}
           width={vpRect.width}
           height={vpRect.height}
-          fill="rgba(74, 158, 255, 0.2)"
-          stroke="#4a9eff"
+          fill="rgba(71, 140, 191, 0.2)"
+          stroke="#478cbf"
           strokeWidth={1}
         />
       </svg>

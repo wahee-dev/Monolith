@@ -58,7 +58,7 @@ function buildGridDefs(): React.ReactElement {
         <path
           d="M 40 0 L 0 0 0 40"
           fill="none"
-          stroke="#1a1a2e"
+          stroke="#1d1f27"
           strokeWidth="0.5"
         />
       </pattern>
@@ -72,7 +72,7 @@ function buildGridDefs(): React.ReactElement {
         <path
           d="M 200 0 L 0 0 0 200"
           fill="none"
-          stroke="#252540"
+          stroke="#2b2e3b"
           strokeWidth="1"
         />
       </pattern>
@@ -505,7 +505,7 @@ export function MeshCanvas({
         onClick={handleSvgClick}
       >
         {buildGridDefs()}
-        <rect x={vbX} y={vbY} width={vbW} height={vbH} fill="#08080f" />
+        <rect x={vbX} y={vbY} width={vbW} height={vbH} fill="#20232e" />
         <rect x={vbX} y={vbY} width={vbW} height={vbH} fill="url(#grid-thick)" />
 
         {recomputedEdges.map((edge) => (
