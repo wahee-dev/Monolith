@@ -42,21 +42,20 @@ export function TemplateDropdown({ onSelect }: TemplateDropdownProps): React.Rea
         type="button"
         onClick={(): void => setIsOpen(!isOpen)}
         style={{
-          background: 'transparent',
-          border: `1px solid ${isOpen ? '#00ffff' : '#333'}`,
+          background: isOpen ? '#333644' : 'transparent',
+          border: `1px solid #444`,
           borderRadius: '3px',
-          color: isOpen ? '#00ffff' : '#aaaaaa',
+          color: '#e0e0e0',
           cursor: 'pointer',
-          fontSize: '10px',
-          padding: '1px 6px',
-          fontFamily: 'monospace',
+          fontSize: '11px',
+          padding: '4px 10px',
           display: 'flex',
           alignItems: 'center',
-          gap: '3px',
+          gap: '6px',
         }}
       >
         Templates
-        <span style={{ fontSize: '8px', lineHeight: 1 }}>{isOpen ? '▲' : '▼'}</span>
+        <span style={{ fontSize: '10px', opacity: 0.6 }}>{isOpen ? '▲' : '▼'}</span>
       </button>
 
       {isOpen && (
@@ -67,12 +66,13 @@ export function TemplateDropdown({ onSelect }: TemplateDropdownProps): React.Rea
             left: 0,
             marginTop: '4px',
             minWidth: '220px',
-            backgroundColor: '#1a1a2e',
-            border: '1px solid #2a2a3e',
+            backgroundColor: '#252833',
+            border: '1px solid #1d1f27',
             borderRadius: '4px',
             zIndex: 100,
             maxHeight: '320px',
             overflowY: 'auto',
+            boxShadow: '0 8px 16px rgba(0,0,0,0.4)',
           }}
         >
           {CATEGORIES.map((category) => {
@@ -104,13 +104,12 @@ export function TemplateDropdown({ onSelect }: TemplateDropdownProps): React.Rea
                       textAlign: 'left',
                       background: 'transparent',
                       border: 'none',
-                      padding: '6px 8px',
+                      padding: '8px 12px',
                       cursor: 'pointer',
-                      fontFamily: 'monospace',
-                      borderBottom: '1px solid #222233',
+                      borderBottom: '1px solid #1d1f27',
                     }}
                     onMouseEnter={(e): void => {
-                      (e.currentTarget as HTMLButtonElement).style.backgroundColor = '#222244';
+                      (e.currentTarget as HTMLButtonElement).style.backgroundColor = '#333644';
                     }}
                     onMouseLeave={(e): void => {
                       (e.currentTarget as HTMLButtonElement).style.backgroundColor = 'transparent';

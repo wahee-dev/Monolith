@@ -125,9 +125,10 @@ export function buildEnvironment(
   expressions: ReadonlyMap<string, string>,
 ): LawResult<Environment> {
   const env = new Map<string, unknown>();
+  const activeScene = state.scenes.get(state.activeSceneId)!;
 
-  for (let i = 0; i < state.connections.length; i++) {
-    const conn = state.connections[i]!;
+  for (let i = 0; i < activeScene.connections.length; i++) {
+    const conn = activeScene.connections[i]!;
     if ((conn.to as string) !== nodeId) continue;
 
     const sourceId = conn.from as string;
@@ -188,6 +189,7 @@ export function executeGraph(
   expressions: ReadonlyMap<string, string>,
 ): LawResult<GraphExecutionResult> {
   const startTime = Date.now();
+  const activeScene = state.scenes.get(state.activeSceneId)!;
 
   const nodeLikeMap = new Map<
     string,
@@ -197,11 +199,11 @@ export function executeGraph(
       readonly outputs: ReadonlyArray<PortDefinition>;
     }
   >();
-  for (const [nodeId, node] of state.nodes) {
+  for (const [nodeId, node] of activeScene.nodes) {
     nodeLikeMap.set(nodeId as string, latticeNodeToNodeLike(node));
   }
 
-  const connectionLikes = state.connections.map((conn) => ({
+  const connectionLikes = activeScene.connections.map((conn) => ({
     id: conn.id,
     from: conn.from as string,
     to: conn.to as string,
@@ -224,11 +226,11 @@ export function executeGraph(
   }
 
   const nodeIds: string[] = [];
-  for (const key of state.nodes.keys()) {
+  for (const key of activeScene.nodes.keys()) {
     nodeIds.push(key as string);
   }
 
-  const simpleConnections = state.connections.map((conn) => ({
+  const simpleConnections = activeScene.connections.map((conn) => ({
     from: conn.from as string,
     to: conn.to as string,
   }));
@@ -243,7 +245,7 @@ export function executeGraph(
 
   for (let i = 0; i < sortResult.value.length; i++) {
     const nodeId = sortResult.value[i]!;
-    const node = state.nodes.get(createLatticeNodeId(nodeId));
+    const node = activeScene.nodes.get(createLatticeNodeId(nodeId));
     if (node === undefined) {
       return {
         ok: false,
@@ -342,7 +344,8 @@ export function executeSingleNode(
   readonly state: LatticeState;
   readonly trace: ReadonlyArray<ExecutionTrace>;
 }> {
-  const node = state.nodes.get(createLatticeNodeId(nodeId));
+  const activeScene = state.scenes.get(state.activeSceneId)!;
+  const node = activeScene.nodes.get(createLatticeNodeId(nodeId));
   if (node === undefined) {
     return {
       ok: false,

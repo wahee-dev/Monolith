@@ -1,4 +1,4 @@
-import type { LatticeState, LatticeNode } from '@lattice/types';
+import type { LatticeState, LatticeNode, LatticeNodeId, LatticeConnection } from '@lattice/types';
 import type { LawResult } from '@law/types';
 import type { PortType } from '@engine/types';
 import type { NodeView, EdgeView, MeshView, FieldView, TypeStatus, PortView } from './types';
@@ -173,13 +173,15 @@ function buildNodeFields(
 
 function buildNodeViews(
   state: LatticeState,
+  nodes: ReadonlyMap<LatticeNodeId, LatticeNode>,
+  connections: ReadonlyArray<LatticeConnection>,
   layoutMap: ReadonlyMap<string, { readonly x: number; readonly y: number; readonly width: number; readonly height: number }>,
   expressions: ReadonlyMap<string, string>,
   typeStatusMap: ReadonlyMap<string, TypeStatus>,
   typeErrors: ReadonlyMap<string, string>,
 ): ReadonlyArray<NodeView> {
   const views: NodeView[] = [];
-  const nodeEntries = Array.from(state.nodes.entries()).sort(
+  const nodeEntries = Array.from(nodes.entries()).sort(
     (a, b) => (a[0] as string).localeCompare(b[0] as string),
   );
 
@@ -190,7 +192,7 @@ function buildNodeViews(
   }
 
   const kindRunningCounters = new Map<string, number>();
-  const connectionData = state.connections.map((c) => ({
+  const connectionData = connections.map((c: any) => ({
     from: c.from as string,
     to: c.to as string,
     fromPort: c.fromPort,
@@ -247,7 +249,7 @@ function getPortTypeFromNodeView(
 }
 
 function buildEdgeViews(
-  state: LatticeState,
+  connections: ReadonlyArray<LatticeConnection>,
   nodeViews: ReadonlyArray<NodeView>,
 ): ReadonlyArray<EdgeView> {
   const edges: EdgeView[] = [];
@@ -257,7 +259,7 @@ function buildEdgeViews(
     viewMap.set(view.id, view);
   }
 
-  const sortedConnections = [...state.connections].sort(
+  const sortedConnections = [...connections].sort(
     (a, b) => a.id.localeCompare(b.id),
   );
 
@@ -295,9 +297,10 @@ export function projectMesh(
   const exprMap = expressions ?? new Map<string, string>();
   const statusMap = typeStatusMap ?? new Map<string, TypeStatus>();
   const errorMap = typeErrors ?? new Map<string, string>();
+  const activeScene = state.scenes.get(state.activeSceneId)!;
 
-  const nodeList = Array.from(state.nodes.values());
-  const layoutRects = computeLayout(nodeList, state.connections);
+  const nodeList = Array.from(activeScene.nodes.values());
+  const layoutRects = computeLayout(nodeList, activeScene.connections);
 
   const layoutMap = new Map<string, { readonly x: number; readonly y: number; readonly width: number; readonly height: number }>();
   const entries = Array.from(layoutRects.entries());
@@ -306,8 +309,8 @@ export function projectMesh(
     layoutMap.set(nodeId as string, rect);
   }
 
-  const nodes = buildNodeViews(state, layoutMap, exprMap, statusMap, errorMap);
-  const edges = buildEdgeViews(state, nodes);
+  const nodes = buildNodeViews(state, activeScene.nodes, activeScene.connections, layoutMap, exprMap, statusMap, errorMap);
+  const edges = buildEdgeViews(activeScene.connections, nodes);
   const bounds = computeBounds(nodes);
 
   return {

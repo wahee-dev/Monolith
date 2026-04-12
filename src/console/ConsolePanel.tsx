@@ -4,10 +4,10 @@ import { useCallback } from 'react';
 import type { ConsoleEntry, ConsoleEntryType, ConsolePanelProps, ConsoleTab } from './types';
 
 const COLORS: Record<ConsoleEntryType, string> = {
-  success: '#4aff9f',
-  error: '#ef4444',
-  info: '#4a9eff',
-  warning: '#f59e0b',
+  success: '#99ff99',
+  error: '#ff9999',
+  info: '#478cbf',
+  warning: '#ffdd75',
 };
 
 const TABS: ConsoleTab[] = ['output', 'errors', 'warnings', 'logs'];
@@ -52,15 +52,22 @@ function ConsoleEntryView({
         display: 'flex',
         alignItems: 'flex-start',
         gap: '8px',
-        padding: '4px 8px',
-        borderBottom: '1px solid #1a1a2e',
+        padding: '6px 12px',
+        borderBottom: '1px solid #1d1f27',
         cursor: entry.nodeId ? 'pointer' : 'default',
-        backgroundColor: entry.nodeId ? '#0a0a12' : 'transparent',
+        backgroundColor: 'transparent',
+        fontFamily: 'monospace',
       }}
       onClick={(): void => {
         if (entry.nodeId) {
           onClick(entry.nodeId);
         }
+      }}
+      onMouseEnter={(e): void => {
+        (e.currentTarget as HTMLDivElement).style.backgroundColor = '#2e313e';
+      }}
+      onMouseLeave={(e): void => {
+        (e.currentTarget as HTMLDivElement).style.backgroundColor = 'transparent';
       }}
       role={entry.nodeId ? 'button' : undefined}
       tabIndex={entry.nodeId ? 0 : undefined}
@@ -72,11 +79,10 @@ function ConsoleEntryView({
     >
       <span
         style={{
-          color: '#444',
-          fontSize: '9px',
-          fontFamily: 'monospace',
+          color: '#555',
+          fontSize: '11px',
           flexShrink: 0,
-          width: '70px',
+          width: '85px',
         }}
       >
         {formatTimestamp(entry.timestamp)}
@@ -84,21 +90,19 @@ function ConsoleEntryView({
       <span
         style={{
           color: color,
-          fontSize: '10px',
-          fontFamily: 'monospace',
+          fontSize: '11px',
           fontWeight: 'bold',
           textTransform: 'uppercase',
           flexShrink: 0,
-          width: '40px',
+          width: '60px',
         }}
       >
         {entry.type}
       </span>
       <span
         style={{
-          color: '#ccc',
-          fontSize: '10px',
-          fontFamily: 'monospace',
+          color: '#e0e0e0',
+          fontSize: '11px',
           flex: 1,
           wordBreak: 'break-word',
         }}
@@ -108,13 +112,15 @@ function ConsoleEntryView({
       {entry.nodeId && (
         <span
           style={{
-            color: '#4a9eff',
-            fontSize: '9px',
-            fontFamily: 'monospace',
+            color: '#478cbf',
+            fontSize: '11px',
             flexShrink: 0,
+            backgroundColor: '#478cbf22',
+            padding: '1px 4px',
+            borderRadius: '2px',
           }}
         >
-          {entry.nodeId}
+          {entry.nodeId.slice(0, 8)}
         </span>
       )}
     </div>
@@ -149,27 +155,28 @@ export function ConsolePanel({
     return (
       <div
         style={{
-          height: '28px',
-          backgroundColor: '#0c0c14',
-          borderTop: '1px solid #1a1a2e',
+          height: '30px',
+          backgroundColor: '#252833',
+          borderTop: '1px solid #1d1f27',
           display: 'flex',
           alignItems: 'center',
-          padding: '0 8px',
+          padding: '0 12px',
           flexShrink: 0,
+          fontFamily: 'system-ui, -apple-system, sans-serif',
         }}
       >
         <span
           style={{
-            color: '#666',
-            fontSize: '10px',
-            fontFamily: 'monospace',
+            color: '#e0e0e0',
+            fontSize: '11px',
             fontWeight: 'bold',
             textTransform: 'uppercase',
+            letterSpacing: '0.5px',
           }}
         >
           Console
         </span>
-        <span style={{ marginLeft: '8px', color: '#444', fontSize: '10px' }}>
+        <span style={{ marginLeft: '12px', color: '#888', fontSize: '11px' }}>
           {consoleState.entries.length} items
         </span>
         <button
@@ -179,11 +186,10 @@ export function ConsolePanel({
             marginLeft: 'auto',
             backgroundColor: 'transparent',
             border: 'none',
-            color: '#666',
+            color: '#888',
             cursor: 'pointer',
-            fontSize: '10px',
-            padding: '2px 4px',
-            fontFamily: 'monospace',
+            fontSize: '12px',
+            padding: '4px',
           }}
         >
           &#9650;
@@ -196,12 +202,13 @@ export function ConsolePanel({
     <div
       style={{
         height: consoleState.height,
-        backgroundColor: '#0c0c14',
-        borderTop: '1px solid #1a1a2e',
+        backgroundColor: '#252833',
+        borderTop: '1px solid #1d1f27',
         display: 'flex',
         flexDirection: 'column',
         flexShrink: 0,
         userSelect: 'none',
+        fontFamily: 'system-ui, -apple-system, sans-serif',
       }}
     >
       <div
@@ -221,9 +228,10 @@ export function ConsolePanel({
         style={{
           display: 'flex',
           alignItems: 'center',
-          height: '28px',
+          height: '30px',
           padding: '0 8px',
-          borderBottom: '1px solid #1a1a2e',
+          backgroundColor: '#2b2e3b',
+          borderBottom: '1px solid #1d1f27',
           flexShrink: 0,
         }}
       >
@@ -235,15 +243,15 @@ export function ConsolePanel({
               onClick={(): void => handleTabClick(tab)}
               style={{
                 backgroundColor:
-                  consoleState.activeTab === tab ? '#1a1a2e' : 'transparent',
-                color: consoleState.activeTab === tab ? '#e0e0e0' : '#666',
+                  consoleState.activeTab === tab ? '#333644' : 'transparent',
+                color: consoleState.activeTab === tab ? '#e0e0e0' : '#888',
                 border: 'none',
                 borderRadius: '3px',
-                padding: '2px 8px',
-                fontSize: '10px',
-                fontFamily: 'monospace',
+                padding: '4px 10px',
+                fontSize: '12px',
                 cursor: 'pointer',
                 textTransform: 'capitalize',
+                transition: 'all 0.1s',
               }}
             >
               {tab}

@@ -18,6 +18,7 @@ interface IDELayoutProps {
   onToggleIDE: () => void;
   onToggleExpand: (id: string) => void;
   onTreeSelect: (selection: TreeSelection) => void;
+  onAddPage: () => void;
   onCodeChange: (code: string) => void;
   onCodeSave: () => void;
   onCodeApply: () => void;
@@ -40,41 +41,31 @@ function buildTreeNodes(
   latticeState: LatticeState,
   _nodePositions: Map<string, Point>,
 ): IDETreeNode[] {
-  const nodes: IDETreeNode[] = [];
-  const nodeMap = new Map<string, IDETreeNode>();
+  const treeNodes: IDETreeNode[] = [];
 
-  for (const [id, node] of latticeState.nodes) {
-    const nodeId = id as string;
-    const kindStr = node.kind;
+  for (const scene of latticeState.scenes.values()) {
+    const nodeChildren: IDETreeNode[] = [];
+    for (const [id, node] of scene.nodes) {
+      nodeChildren.push({
+        id: id as string,
+        type: 'node',
+        name: id as string,
+        kind: node.kind,
+        children: [],
+        isExpanded: true,
+      });
+    }
 
-    nodeMap.set(nodeId, {
-      id: nodeId,
-      type: 'node',
-      name: nodeId,
-      kind: kindStr,
-      children: [],
+    treeNodes.push({
+      id: scene.id,
+      type: 'page',
+      name: scene.name,
+      children: nodeChildren,
       isExpanded: true,
     });
   }
 
-  const componentNode: IDETreeNode = {
-    id: 'main',
-    type: 'component',
-    name: 'Main',
-    kind: 'ui',
-    children: Array.from(nodeMap.values()),
-    isExpanded: true,
-  };
-
-  nodes.push({
-    id: 'main-page',
-    type: 'page',
-    name: 'Page',
-    children: [componentNode],
-    isExpanded: true,
-  });
-
-  return nodes;
+  return treeNodes;
 }
 
 function getNodeCode(
@@ -82,7 +73,8 @@ function getNodeCode(
   nodeId: string,
   expressions: Map<string, string>,
 ): string {
-  const node = latticeState.nodes.get(nodeId as LatticeNodeId);
+  const activeScene = latticeState.scenes.get(latticeState.activeSceneId)!;
+  const node = activeScene.nodes.get(nodeId as LatticeNodeId);
   if (!node) return '';
 
   const expr = expressions.get(nodeId);
@@ -105,6 +97,7 @@ export function IDELayout({
   selectedNodeId,
   onToggleIDE,
   onToggleExpand,
+  onAddPage,
   onCodeChange,
   onCodeSave,
   onCodeApply,
@@ -126,18 +119,14 @@ export function IDELayout({
       setSelectedTreeId(selection.nodeId ?? selection.componentId ?? selection.pageId);
       if (selection.nodeId) {
         onNodeSelect(selection.nodeId);
-      } else if (selection.componentId) {
-        const comp = treeNodes
-          .find((p) => p.id === selection.pageId)
-          ?.children.find((c) => c.id === selection.componentId);
-        if (comp && comp.children.length > 0) {
-          onNodeSelect(comp.children[0]!.id);
-        }
+      } else if (selection.pageId) {
+        // Switching scenes
+        onNodeSelect(null);
       } else {
         onNodeSelect(null);
       }
     },
-    [onNodeSelect, treeNodes],
+    [onNodeSelect],
   );
 
   const handleCodeChange = useCallback(
@@ -173,7 +162,7 @@ export function IDELayout({
             selectedId={selectedTreeId}
             onSelect={handleTreeSelect}
             onToggleExpand={onToggleExpand}
-            onAddPage={function (): void {}}
+            onAddPage={onAddPage}
             onAddComponent={function (_pageId: string): void {}}
             onAddNode={function (_pageId: string, _componentId: string): void {}}
             onDelete={function (_id: string, _type: 'page' | 'component' | 'node'): void {}}

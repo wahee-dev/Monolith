@@ -74,9 +74,10 @@ function buildFlowsFromConnections(
   nodeIds: ReadonlySet<string>,
 ): ReadonlyArray<DataFlow> {
   const flows: DataFlow[] = [];
+  const activeScene = state.scenes.get(state.activeSceneId)!;
 
-  for (let i = 0; i < state.connections.length; i++) {
-    const conn = state.connections[i]!;
+  for (let i = 0; i < activeScene.connections.length; i++) {
+    const conn = activeScene.connections[i]!;
     const fromId = conn.from as string;
     const toId = conn.to as string;
 
@@ -118,7 +119,8 @@ function collectErrors(
     }
   }
 
-  const nodeEntries = Array.from(state.nodes.entries());
+  const activeScene = state.scenes.get(state.activeSceneId)!;
+  const nodeEntries = Array.from(activeScene.nodes.entries());
   for (let i = 0; i < nodeEntries.length; i++) {
     const [nodeId, node] = nodeEntries[i]!;
     const nodeValue = state.values.get(nodeId);
@@ -150,8 +152,9 @@ export function projectShadowApp(
 ): LawResult<ShadowAppState> {
   const screens: ShadowScreen[] = [];
   const nodeIdSet = new Set<string>();
+  const activeScene = latticeState.scenes.get(latticeState.activeSceneId)!;
 
-  const nodeEntries = Array.from(latticeState.nodes.entries()).sort(
+  const nodeEntries = Array.from(activeScene.nodes.entries()).sort(
     (a, b) => (a[0] as string).localeCompare(b[0] as string),
   );
 

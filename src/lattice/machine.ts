@@ -1,7 +1,7 @@
 import { setup, assign } from 'xstate';
 import type { LatticeMachineContext } from './context';
 import type { LatticeEvent } from './events';
-import type { LatticeState } from './types';
+import type { LatticeState, SceneState } from './types';
 import { updateStatus, validateState } from './actions';
 import { addNode, removeNode, addConnection, removeConnection, setNodeValue } from './actions';
 import { executeNode } from './nodes';
@@ -33,7 +33,8 @@ function tryApplyTransition(
       applied = { ok: true, state: removeConnection(currentState, event.connectionId) };
       break;
     case 'LATTICE.EXECUTE_NODE': {
-      const node = currentState.nodes.get(event.nodeId);
+      const activeScene = currentState.scenes.get(currentState.activeSceneId);
+      const node = activeScene?.nodes.get(event.nodeId);
       if (node === undefined) {
         applied = { ok: false, reason: `Node not found` };
       } else {
@@ -103,13 +104,16 @@ export const latticeSetup = setup({
       }),
     }),
     resetToIdle: assign({
-      state: (): LatticeState => ({
-        nodes: new Map(),
-        connections: [],
-        values: new Map(),
-        status: 'idle',
-        version: 0,
-      }),
+      state: (): LatticeState => {
+        const mainScene: SceneState = { id: 'main', name: 'Main', nodes: new Map(), connections: [] };
+        return {
+          scenes: new Map([['main', mainScene]]),
+          activeSceneId: 'main',
+          values: new Map(),
+          status: 'idle',
+          version: 0,
+        };
+      },
     }),
   },
 });

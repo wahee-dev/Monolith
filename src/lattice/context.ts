@@ -1,5 +1,5 @@
 import type { GovernanceLedger } from '@law/types';
-import type { LatticeState } from './types';
+import type { LatticeState, SceneState } from './types';
 
 export type SnapshotState =
   | { readonly status: 'empty' }
@@ -12,9 +12,10 @@ export interface LatticeMachineContext {
 }
 
 export function createEmptyLatticeState(): LatticeState {
+  const mainScene: SceneState = { id: 'main', name: 'Main', nodes: new Map(), connections: [] };
   return {
-    nodes: new Map(),
-    connections: [],
+    scenes: new Map([['main', mainScene]]),
+    activeSceneId: 'main',
     values: new Map(),
     status: 'idle',
     version: 0,

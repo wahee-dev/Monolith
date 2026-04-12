@@ -10,3 +10,4 @@ export type {
 export { projectShadowApp } from './projector';
 
 export { ShadowAppPanel } from './ShadowAppPanel';
+export { LiveApp } from './LiveApp';

@@ -5,11 +5,15 @@ export const TEXT_DEFINITION: NodeTypeDefinition = {
   label: 'Text',
   category: 'ui',
   description: 'Displays text content with customizable font size, color, and style.',
-  inputs: [],
+  inputs: [
+    { name: 'text', type: 'string', label: 'Text', required: true },
+    { name: 'color', type: 'string', label: 'Color', required: false },
+    { name: 'fontSize', type: 'number', label: 'Font Size', required: false },
+  ],
   outputs: [
     { name: 'element', type: 'object', label: 'Element', required: true },
   ],
-  editableSchema: false,
+  editableSchema: true,
 } as const;
 
 export const BUTTON_DEFINITION: NodeTypeDefinition = {
@@ -17,12 +21,16 @@ export const BUTTON_DEFINITION: NodeTypeDefinition = {
   label: 'Button',
   category: 'ui',
   description: 'A clickable button with label and variant options.',
-  inputs: [],
+  inputs: [
+    { name: 'label', type: 'string', label: 'Label', required: true },
+    { name: 'backgroundColor', type: 'string', label: 'Background Color', required: false },
+    { name: 'color', type: 'string', label: 'Text Color', required: false },
+  ],
   outputs: [
     { name: 'element', type: 'object', label: 'Element', required: true },
     { name: 'onClick', type: 'any', label: 'On Click', required: false },
   ],
-  editableSchema: false,
+  editableSchema: true,
 } as const;
 
 export const INPUT_DEFINITION: NodeTypeDefinition = {
@@ -30,12 +38,15 @@ export const INPUT_DEFINITION: NodeTypeDefinition = {
   label: 'Input',
   category: 'ui',
   description: 'A text input field with placeholder and type options.',
-  inputs: [],
+  inputs: [
+    { name: 'placeholder', type: 'string', label: 'Placeholder', required: false },
+    { name: 'initialValue', type: 'string', label: 'Initial Value', required: false },
+  ],
   outputs: [
     { name: 'element', type: 'object', label: 'Element', required: true },
     { name: 'value', type: 'string', label: 'Value', required: false },
   ],
-  editableSchema: false,
+  editableSchema: true,
 } as const;
 
 export const CONTAINER_DEFINITION: NodeTypeDefinition = {
@@ -57,11 +68,16 @@ export const IMAGE_DEFINITION: NodeTypeDefinition = {
   label: 'Image',
   category: 'ui',
   description: 'Displays an image with source, alt text, and size options.',
-  inputs: [],
+  inputs: [
+    { name: 'src', type: 'string', label: 'Source', required: true },
+    { name: 'alt', type: 'string', label: 'Alt Text', required: false },
+    { name: 'width', type: 'number', label: 'Width', required: false },
+    { name: 'height', type: 'number', label: 'Height', required: false },
+  ],
   outputs: [
     { name: 'element', type: 'object', label: 'Element', required: true },
   ],
-  editableSchema: false,
+  editableSchema: true,
 } as const;
 
 export const FLEX_DEFINITION: NodeTypeDefinition = {
