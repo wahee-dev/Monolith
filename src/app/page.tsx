@@ -48,43 +48,78 @@ import type { ConsoleState, ConsoleTab, ConsoleEntry } from '@console/types';
 const KIND_SCHEMAS: Record<LatticeNodeKind, NodeSchema> = {
   source: {
     input: {},
-    output: { emit: { name: 'emit', type: 'string', required: true } },
+    output: { output: { name: 'Output', type: 'string', required: true } },
   },
   transform: {
-    input: { input: { name: 'input', type: 'string', required: true } },
-    output: { output: { name: 'output', type: 'string', required: true } },
+    input: { input: { name: 'Input', type: 'string', required: true } },
+    output: { output: { name: 'Output', type: 'string', required: true } },
   },
   sink: {
-    input: { receive: { name: 'receive', type: 'string', required: true } },
+    input: { input: { name: 'Input', type: 'any' as any, required: true } },
     output: {},
   },
   gate: {
     input: {
-      condition: { name: 'condition', type: 'boolean', required: true },
-      data: { name: 'data', type: 'string', required: true },
+      enable: { name: 'Enable', type: 'boolean', required: true },
+      data: { name: 'Data', type: 'string', required: true },
     },
-    output: { passed: { name: 'passed', type: 'string', required: true } },
+    output: { output: { name: 'Output', type: 'string', required: true } },
   },
   merge: {
     input: {
-      a: { name: 'a', type: 'string', required: true },
-      b: { name: 'b', type: 'string', required: true },
+      a: { name: 'Input A', type: 'string', required: true },
+      b: { name: 'Input B', type: 'string', required: true },
     },
-    output: { merged: { name: 'merged', type: 'string', required: true } },
+    output: { output: { name: 'Output', type: 'string', required: true } },
   },
   split: {
-    input: { input: { name: 'input', type: 'string', required: true } },
+    input: { input: { name: 'Input', type: 'string', required: true } },
     output: {
-      left: { name: 'left', type: 'string', required: true },
-      right: { name: 'right', type: 'string', required: true },
+      a: { name: 'Output A', type: 'string', required: true },
+      b: { name: 'Output B', type: 'string', required: true },
     },
   },
   text: { input: {}, output: { element: { name: 'element', type: 'object', required: true } } },
-  button: { input: {}, output: { element: { name: 'element', type: 'object', required: true } } },
-  input: { input: {}, output: { element: { name: 'element', type: 'object', required: true } } },
+  button: { input: {}, output: { element: { name: 'element', type: 'object', required: true }, onClick: { name: 'onClick', type: 'any' as any, required: true } } },
+  input: { input: {}, output: { element: { name: 'element', type: 'object', required: true }, onChange: { name: 'onChange', type: 'any' as any, required: true }, value: { name: 'value', type: 'string', required: true } } },
   container: { input: { children: { name: 'children', type: 'object', required: true } }, output: { element: { name: 'element', type: 'object', required: true } } },
   image: { input: {}, output: { element: { name: 'element', type: 'object', required: true } } },
   flex: { input: { children: { name: 'children', type: 'object', required: true } }, output: { element: { name: 'element', type: 'object', required: true } } },
+  math: { input: { a: { name: 'a', type: 'number', required: true }, b: { name: 'b', type: 'number', required: true } }, output: { result: { name: 'result', type: 'number', required: true } } },
+  'string-transform': { input: { input: { name: 'input', type: 'string', required: true } }, output: { output: { name: 'output', type: 'string', required: true } } },
+  getState: { input: {}, output: { value: { name: 'value', type: 'any' as any, required: true } } },
+  setState: { input: { value: { name: 'value', type: 'any' as any, required: true } }, output: { done: { name: 'done', type: 'any' as any, required: true } } },
+  onEvent: { input: {}, output: { trigger: { name: 'trigger', type: 'any' as any, required: true } } },
+  constant: { input: {}, output: { value: { name: 'value', type: 'any' as any, required: true } } },
+  'if-else': { input: { condition: { name: 'condition', type: 'boolean', required: true }, then: { name: 'then', type: 'any' as any, required: true }, else: { name: 'else', type: 'any' as any, required: true } }, output: { result: { name: 'result', type: 'any' as any, required: true } } },
+  'if-condition': { input: { condition: { name: 'condition', type: 'boolean', required: true }, trueBranch: { name: 'trueBranch', type: 'any' as any, required: true }, falseBranch: { name: 'falseBranch', type: 'any' as any, required: true } }, output: { result: { name: 'result', type: 'any' as any, required: true } } },
+  switch: { input: { value: { name: 'value', type: 'any' as any, required: true } }, output: { case1: { name: 'case1', type: 'any' as any, required: true } } },
+  compare: { input: { a: { name: 'a', type: 'any' as any, required: true }, b: { name: 'b', type: 'any' as any, required: true } }, output: { result: { name: 'result', type: 'boolean', required: true } } },
+  and: { input: { a: { name: 'a', type: 'boolean', required: true }, b: { name: 'b', type: 'boolean', required: true } }, output: { result: { name: 'result', type: 'boolean', required: true } } },
+  or: { input: { a: { name: 'a', type: 'boolean', required: true }, b: { name: 'b', type: 'boolean', required: true } }, output: { result: { name: 'result', type: 'boolean', required: true } } },
+  not: { input: { value: { name: 'value', type: 'boolean', required: true } }, output: { result: { name: 'result', type: 'boolean', required: true } } },
+  foreach: { input: { array: { name: 'array', type: 'array', required: true }, body: { name: 'body', type: 'any' as any, required: true } }, output: { result: { name: 'result', type: 'array', required: true } } },
+  function: { input: { arg1: { name: 'arg1', type: 'any' as any, required: true } }, output: { result: { name: 'result', type: 'any' as any, required: true } } },
+  array: { input: { items: { name: 'items', type: 'any' as any, required: true } }, output: { result: { name: 'result', type: 'array', required: true } } },
+  'variable-state': { input: { value: { name: 'value', type: 'any' as any, required: true } }, output: { value: { name: 'value', type: 'any' as any, required: true } } },
+  'http-request': { input: { url: { name: 'url', type: 'string', required: true } }, output: { body: { name: 'body', type: 'any' as any, required: true } } },
+  timer: { input: {}, output: { tick: { name: 'tick', type: 'number', required: true } } },
+  'console-log': { input: { value: { name: 'value', type: 'any' as any, required: true } }, output: {} },
+  webhook: { input: {}, output: { payload: { name: 'payload', type: 'object', required: true } } },
+  store: { input: { value: { name: 'value', type: 'any' as any, required: true } }, output: { stored: { name: 'stored', type: 'any' as any, required: true } } },
+  fetch: { input: { url: { name: 'url', type: 'string', required: true } }, output: { data: { name: 'data', type: 'any' as any, required: true } } },
+  delay: { input: { input: { name: 'input', type: 'any' as any, required: true } }, output: { output: { name: 'output', type: 'any' as any, required: true } } },
+  batch: { input: { item: { name: 'item', type: 'any' as any, required: true } }, output: { batch: { name: 'batch', type: 'array', required: true } } },
+  debounce: { input: { input: { name: 'input', type: 'any' as any, required: true } }, output: { output: { name: 'output', type: 'any' as any, required: true } } },
+  'merge-objects': { input: { a: { name: 'a', type: 'object', required: true }, b: { name: 'b', type: 'object', required: true } }, output: { merged: { name: 'merged', type: 'object', required: true } } },
+  'split-object': { input: { object: { name: 'object', type: 'object', required: true } }, output: { keys: { name: 'keys', type: 'array', required: true } } },
+  retry: { input: { input: { name: 'input', type: 'any' as any, required: true } }, output: { output: { name: 'output', type: 'any' as any, required: true } } },
+  'json-parse': { input: { json: { name: 'json', type: 'string', required: true } }, output: { object: { name: 'object', type: 'object', required: true } } },
+  'json-stringify': { input: { object: { name: 'object', type: 'object', required: true } }, output: { json: { name: 'json', type: 'string', required: true } } },
+  template: { input: { data: { name: 'data', type: 'object', required: true } }, output: { result: { name: 'result', type: 'string', required: true } } },
+  variable: { input: {}, output: { value: { name: 'value', type: 'any' as any, required: true } } },
+  navigate: { input: { path: { name: 'path', type: 'string', required: true } }, output: { done: { name: 'done', type: 'any' as any, required: true } } },
+  subscribe: { input: { key: { name: 'key', type: 'string', required: true } }, output: { value: { name: 'value', type: 'any' as any, required: true } } },
 };
 
 function getSchemaForKind(kind: LatticeNodeKind): NodeSchema {
@@ -97,7 +132,7 @@ function getSchemaForKind(kind: LatticeNodeKind): NodeSchema {
       const t = port.type;
       const fieldType: 'string' | 'number' | 'boolean' | 'object' | 'array' =
         (t === 'string' || t === 'number' || t === 'boolean' || t === 'object' || t === 'array') ? t : 'string';
-      input[port.name] = { name: port.label, type: fieldType, required: true };
+      input[port.name] = { name: port.label, type: fieldType, required: port.required };
     }
     const output: Record<string, SchemaField> = {};
     for (let i = 0; i < def.outputs.length; i++) {
@@ -105,7 +140,7 @@ function getSchemaForKind(kind: LatticeNodeKind): NodeSchema {
       const t = port.type;
       const fieldType: 'string' | 'number' | 'boolean' | 'object' | 'array' =
         (t === 'string' || t === 'number' || t === 'boolean' || t === 'object' || t === 'array') ? t : 'string';
-      output[port.name] = { name: port.label, type: fieldType, required: true };
+      output[port.name] = { name: port.label, type: fieldType, required: port.required };
     }
     return { input, output };
   }
@@ -130,8 +165,8 @@ function createSampleState(): {
     id: connectionId,
     from: sourceId,
     to: sinkId,
-    fromPort: 'emit',
-    toPort: 'receive',
+    fromPort: 'output',
+    toPort: 'input',
   };
 
   const mainScene: SceneState = {
@@ -210,6 +245,24 @@ export default function Home(): React.ReactElement {
 
   const activeScene = useMemo(() => latticeState.scenes.get(latticeState.activeSceneId)!, [latticeState]);
 
+  const addConsoleEntry = useCallback(
+    (type: ConsoleEntry['type'], message: string, nodeId?: string, details?: string): void => {
+      const entry: ConsoleEntry = {
+        id: `console-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+        type,
+        message,
+        timestamp: Date.now(),
+        ...(nodeId !== undefined && { nodeId }),
+        ...(details !== undefined && { details }),
+      };
+      setConsoleState((prev) => ({
+        ...prev,
+        entries: [...prev.entries, entry],
+      }));
+    },
+    [],
+  );
+
   const graphValidation = useMemo((): GraphValidation | null => {
     if (activeScene.nodes.size === 0) return null;
 
@@ -219,15 +272,19 @@ export default function Home(): React.ReactElement {
         readonly kind: string;
         readonly inputs: ReadonlyArray<{ readonly name: string; readonly type: PortType; readonly label: string; readonly required: boolean }>;
         readonly outputs: ReadonlyArray<{ readonly name: string; readonly type: PortType; readonly label: string; readonly required: boolean }>;
+        readonly hasExpression?: boolean;
       }
     >();
 
     for (const [id, node] of activeScene.nodes) {
       const defResult = getNodeTypeDefinition(node.kind);
+      const expr = expressions.get(id as string);
+      const hasExpression = expr !== undefined && expr.trim().length > 0;
+
       if (defResult.ok) {
-        nodeLikeMap.set(id as string, defResult.value);
+        nodeLikeMap.set(id as string, { ...defResult.value, hasExpression });
       } else {
-        nodeLikeMap.set(id as string, { kind: node.kind, inputs: [], outputs: [] });
+        nodeLikeMap.set(id as string, { kind: node.kind, inputs: [], outputs: [], hasExpression });
       }
     }
 
@@ -240,22 +297,7 @@ export default function Home(): React.ReactElement {
     }));
 
     return validateGraph(nodeLikeMap, connectionLike);
-  }, [activeScene]);
-
-  const pushToHistory = useCallback(
-    (label: string): void => {
-      setHistoryState((prev) =>
-        pushHistory(prev, {
-          state: latticeState,
-          expressions,
-          nodePositions,
-          label,
-          timestamp: Date.now(),
-        }),
-      );
-    },
-    [latticeState, expressions, nodePositions],
-  );
+  }, [activeScene, expressions]);
 
   const applyDiagnostics = useCallback(
     (diagnostics: ReadonlyMap<string, TypeCheckDiagnostic>): void => {
@@ -277,6 +319,72 @@ export default function Home(): React.ReactElement {
       setTypeErrors(newErrors);
     },
     [],
+  );
+
+  const handleRun = useCallback((): void => {
+    const { diagnostics: runDiagnostics, canExecute } = typeCheckGuard.runTypeCheck(expressions);
+    applyDiagnostics(runDiagnostics);
+
+    if (!canExecute) {
+      setErrorMessage('Execution blocked: type check errors detected');
+      return;
+    }
+
+    if (graphValidation !== null && !graphValidation.isValid) {
+      const errorMessages = graphValidation.errors.map((e) => e.message).join('; ');
+      setErrorMessage(`Graph validation failed: ${errorMessages}`);
+      for (const err of graphValidation.errors) {
+        addConsoleEntry('error', err.message, err.nodeId);
+      }
+      for (const warn of graphValidation.warnings) {
+        addConsoleEntry('warning', warn.message, warn.nodeId);
+      }
+      return;
+    }
+
+    setErrorMessage('');
+
+    const startResult = startExecution(latticeState);
+    if (!startResult.ok) {
+      setErrorMessage(startResult.error.message);
+      return;
+    }
+
+    setExecutionState(startResult.value);
+
+    const execResult = executeGraph(latticeState, expressions);
+    if (execResult.ok) {
+      setExecutionResult(execResult.value);
+      addConsoleEntry('success', `Execution completed in ${execResult.value.durationMs}ms`);
+      const newState = { ...latticeState };
+      const newValues = new Map(newState.values);
+      for (const [nodeId, value] of execResult.value.outputs) {
+        newValues.set(nodeId as LatticeNodeId, value);
+      }
+      setLatticeState({ ...newState, values: newValues, version: newState.version + 1 });
+      for (const traceItem of execResult.value.trace) {
+        addConsoleEntry('info', `${traceItem.nodeId}: executed`, traceItem.nodeId);
+      }
+    } else {
+      setErrorMessage(execResult.error.message);
+      addConsoleEntry('error', execResult.error.message);
+      setExecutionResult(null);
+    }
+  }, [expressions, typeCheckGuard, applyDiagnostics, graphValidation, latticeState, addConsoleEntry]);
+
+  const pushToHistory = useCallback(
+    (label: string): void => {
+      setHistoryState((prev) =>
+        pushHistory(prev, {
+          state: latticeState,
+          expressions,
+          nodePositions,
+          label,
+          timestamp: Date.now(),
+        }),
+      );
+    },
+    [latticeState, expressions, nodePositions],
   );
 
   const handleAddNode = useCallback(
@@ -367,8 +475,11 @@ export default function Home(): React.ReactElement {
       setSelectedNodeId(null);
       setSelectedEdgeId(null);
       setEditingNodeId(null);
+
+      // Auto-run after template load
+      setTimeout(() => handleRun(), 100);
     },
-    [pushToHistory],
+    [pushToHistory, handleRun],
   );
 
   const initialTemplateLoaded = useRef(false);
@@ -615,74 +726,6 @@ export default function Home(): React.ReactElement {
     [],
   );
 
-  const addConsoleEntry = useCallback(
-    (type: ConsoleEntry['type'], message: string, nodeId?: string, details?: string): void => {
-      const entry: ConsoleEntry = {
-        id: `console-${Date.now()}-${Math.random().toString(36).slice(2)}`,
-        type,
-        message,
-        timestamp: Date.now(),
-        ...(nodeId !== undefined && { nodeId }),
-        ...(details !== undefined && { details }),
-      };
-      setConsoleState((prev) => ({
-        ...prev,
-        entries: [...prev.entries, entry],
-      }));
-    },
-    [],
-  );
-
-  const handleRun = useCallback((): void => {
-    const { diagnostics: runDiagnostics, canExecute } = typeCheckGuard.runTypeCheck(expressions);
-    applyDiagnostics(runDiagnostics);
-
-    if (!canExecute) {
-      setErrorMessage('Execution blocked: type check errors detected');
-      return;
-    }
-
-    if (graphValidation !== null && !graphValidation.isValid) {
-      const errorMessages = graphValidation.errors.map((e) => e.message).join('; ');
-      setErrorMessage(`Graph validation failed: ${errorMessages}`);
-      for (const err of graphValidation.errors) {
-        addConsoleEntry('error', err.message, err.nodeId);
-      }
-      for (const warn of graphValidation.warnings) {
-        addConsoleEntry('warning', warn.message, warn.nodeId);
-      }
-      return;
-    }
-
-    setErrorMessage('');
-
-    const startResult = startExecution(latticeState);
-    if (!startResult.ok) {
-      setErrorMessage(startResult.error.message);
-      return;
-    }
-
-    setExecutionState(startResult.value);
-
-    const execResult = executeGraph(latticeState, expressions);
-    if (execResult.ok) {
-      setExecutionResult(execResult.value);
-      addConsoleEntry('success', `Execution completed in ${execResult.value.durationMs}ms`);
-      const newState = { ...latticeState };
-      const newValues = new Map(newState.values);
-      for (const [nodeId, value] of execResult.value.outputs) {
-        newValues.set(nodeId as LatticeNodeId, value);
-      }
-      setLatticeState({ ...newState, values: newValues, version: newState.version + 1 });
-      for (const traceItem of execResult.value.trace) {
-        addConsoleEntry('info', `${traceItem.nodeId}: executed`, traceItem.nodeId);
-      }
-    } else {
-      setErrorMessage(execResult.error.message);
-      addConsoleEntry('error', execResult.error.message);
-      setExecutionResult(null);
-    }
-  }, [expressions, typeCheckGuard, applyDiagnostics, graphValidation, latticeState, addConsoleEntry]);
 
   const handleStop = useCallback((): void => {
     if (executionTimerRef.current !== null) {
@@ -1414,7 +1457,8 @@ export default function Home(): React.ReactElement {
               executionResult={executionResult}
               onEvent={(nodeId, eventName, data) => {
                 addConsoleEntry('info', `Event: ${eventName} on ${nodeId}`, nodeId, JSON.stringify(data));
-                handleRun(); // Simple event-driven trigger for now
+                getMonolithAPI().setState('currentEvent', { nodeId, eventName, data });
+                handleRun();
               }}
             />
             <div style={{ height: '200px', borderTop: '1px solid #1d1f27' }}>

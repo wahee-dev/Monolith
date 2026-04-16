@@ -146,6 +146,48 @@ export function executeNode(
       return executeMergeNode(node, input);
     case 'split':
       return executeSplitNode(node, input);
+    case 'math':
+    case 'string-transform':
+    case 'getState':
+    case 'setState':
+    case 'onEvent':
+    case 'constant':
+    case 'if-else':
+    case 'if-condition':
+    case 'switch':
+    case 'compare':
+    case 'and':
+    case 'or':
+    case 'not':
+    case 'foreach':
+    case 'function':
+    case 'array':
+    case 'variable-state':
+    case 'http-request':
+    case 'timer':
+    case 'console-log':
+    case 'webhook' :
+    case 'store':
+    case 'fetch':
+    case 'delay':
+    case 'batch':
+    case 'debounce':
+    case 'merge-objects':
+    case 'split-object':
+    case 'retry':
+    case 'json-parse':
+    case 'json-stringify':
+    case 'template':
+    case 'variable':
+    case 'navigate':
+    case 'subscribe':
+    case 'text':
+    case 'button':
+    case 'input':
+    case 'container':
+    case 'image':
+    case 'flex':
+      return { ok: true, value: { ...input } };
     default:
       return {
         ok: false,

@@ -15,8 +15,10 @@ const COERCIBLE_TO_STRING: ReadonlySet<PortType> = new Set<PortType>([
 ]);
 
 export function canConnectTypes(from: PortType, to: PortType): boolean {
-  if (from === 'void' || to === 'void') {
-    return false;
+  const toT = to as string;
+  const fromT = from as string;
+  if (fromT === 'void' || toT === 'void' || toT === 'any') {
+    return true;
   }
   if (from === 'any' || to === 'any') {
     return true;
@@ -145,7 +147,7 @@ export function findOrphanNodes(
 }
 
 export function findMissingInputs(
-  nodes: ReadonlyMap<string, { readonly inputs: ReadonlyArray<PortDefinition> }>,
+  nodes: ReadonlyMap<string, NodeLike>,
   connections: ReadonlyArray<{ readonly to: string; readonly toPort: string }>,
 ): ReadonlyArray<{ readonly nodeId: string; readonly portName: string }> {
   const incomingByNode = new Map<string, Set<string>>();
@@ -162,6 +164,9 @@ export function findMissingInputs(
   const missing: { readonly nodeId: string; readonly portName: string }[] = [];
 
   for (const [nodeId, def] of nodes) {
+    // If node has an expression, it satisfies its own requirements
+    if (def.hasExpression) continue;
+
     const incoming = incomingByNode.get(nodeId);
     for (let i = 0; i < def.inputs.length; i++) {
       const port = def.inputs[i]!;
@@ -180,6 +185,7 @@ interface NodeLike {
   readonly kind: string;
   readonly inputs: ReadonlyArray<PortDefinition>;
   readonly outputs: ReadonlyArray<PortDefinition>;
+  readonly hasExpression?: boolean;
 }
 
 interface ConnectionLike {

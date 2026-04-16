@@ -24,7 +24,42 @@ export type LatticeNodeKind =
   | 'input'
   | 'container'
   | 'image'
-  | 'flex';
+  | 'flex'
+  | 'math'
+  | 'string-transform'
+  | 'getState'
+  | 'setState'
+  | 'onEvent'
+  | 'constant'
+  | 'if-else'
+  | 'if-condition'
+  | 'switch'
+  | 'compare'
+  | 'and'
+  | 'or'
+  | 'not'
+  | 'foreach'
+  | 'function'
+  | 'array'
+  | 'variable-state'
+  | 'http-request'
+  | 'timer'
+  | 'console-log'
+  | 'webhook'
+  | 'store'
+  | 'fetch'
+  | 'delay'
+  | 'batch'
+  | 'debounce'
+  | 'merge-objects'
+  | 'split-object'
+  | 'retry'
+  | 'json-parse'
+  | 'json-stringify'
+  | 'template'
+  | 'variable'
+  | 'navigate'
+  | 'subscribe';
 
 export interface NodeSchema {
   readonly input: Record<string, SchemaField>;
@@ -34,7 +69,7 @@ export interface NodeSchema {
 export interface SchemaField {
   readonly name: string;
   readonly type: 'string' | 'number' | 'boolean' | 'object' | 'array';
-  readonly required: true;
+  readonly required: boolean;
 }
 
 export interface LatticeState {

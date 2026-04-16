@@ -45,6 +45,7 @@ export const INPUT_DEFINITION: NodeTypeDefinition = {
   outputs: [
     { name: 'element', type: 'object', label: 'Element', required: true },
     { name: 'value', type: 'string', label: 'Value', required: false },
+    { name: 'onChange', type: 'any', label: 'On Change', required: false },
   ],
   editableSchema: true,
 } as const;

@@ -81,10 +81,59 @@ const CONDITIONAL_GATE: Template = {
   ],
 };
 
+const COUNTER_APP: Template = {
+  id: 'counter-app',
+  name: 'Counter App',
+  description: 'A functional counter using state and math',
+  category: 'Example',
+  nodes: [
+    { kind: 'button', position: { x: 100, y: 100 }, expression: "'+' + (state.count || 0)" },
+    { kind: 'button', position: { x: 100, y: 250 }, expression: "'-' + (state.count || 0)" },
+    { kind: 'math', position: { x: 300, y: 100 }, expression: "(state.count || 0) + 1" },
+    { kind: 'math', position: { x: 300, y: 250 }, expression: "(state.count || 0) - 1" },
+    { kind: 'setState', position: { x: 500, y: 100 }, expression: "{ count: value }" },
+    { kind: 'setState', position: { x: 500, y: 250 }, expression: "{ count: value }" },
+    { kind: 'text', position: { x: 100, y: 400 }, expression: "'Count is: ' + (state.count || 0)" },
+    { kind: 'sink', position: { x: 700, y: 250 } },
+  ],
+  connections: [
+    { fromNodeIndex: 0, fromPort: 'onClick', toNodeIndex: 2, toPort: 'a' },
+    { fromNodeIndex: 2, fromPort: 'result', toNodeIndex: 4, toPort: 'value' },
+    { fromNodeIndex: 1, fromPort: 'onClick', toNodeIndex: 3, toPort: 'a' },
+    { fromNodeIndex: 3, fromPort: 'result', toNodeIndex: 5, toPort: 'value' },
+    { fromNodeIndex: 4, fromPort: 'done', toNodeIndex: 7, toPort: 'input' },
+    { fromNodeIndex: 5, fromPort: 'done', toNodeIndex: 7, toPort: 'input' },
+    { fromNodeIndex: 0, fromPort: 'element', toNodeIndex: 7, toPort: 'input' },
+    { fromNodeIndex: 1, fromPort: 'element', toNodeIndex: 7, toPort: 'input' },
+    { fromNodeIndex: 6, fromPort: 'element', toNodeIndex: 7, toPort: 'input' },
+  ],
+};
+
+const GREETING_APP: Template = {
+  id: 'greeting-app',
+  name: 'Greeting App',
+  description: 'Interactive greeting with input and state',
+  category: 'Example',
+  nodes: [
+    { kind: 'input', position: { x: 100, y: 100 }, expression: "'World'" },
+    { kind: 'setState', position: { x: 300, y: 100 }, expression: "{ name: value }" },
+    { kind: 'text', position: { x: 100, y: 300 }, expression: "'Hello, ' + (state.name || 'World') + '!'" },
+    { kind: 'sink', position: { x: 500, y: 200 } },
+  ],
+  connections: [
+    { fromNodeIndex: 0, fromPort: 'onChange', toNodeIndex: 1, toPort: 'value' },
+    { fromNodeIndex: 1, fromPort: 'done', toNodeIndex: 3, toPort: 'input' },
+    { fromNodeIndex: 0, fromPort: 'element', toNodeIndex: 3, toPort: 'input' },
+    { fromNodeIndex: 2, fromPort: 'element', toNodeIndex: 3, toPort: 'input' },
+  ],
+};
+
 export const TEMPLATES: ReadonlyArray<Template> = [
   GETTING_STARTED,
   DATA_FLOW,
   CONDITIONAL_GATE,
+  COUNTER_APP,
+  GREETING_APP,
 ];
 
 export function getTemplateById(id: string): Template | undefined {
